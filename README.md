@@ -43,10 +43,13 @@ Phase 2   상태 변경 → Component + Hooks → 다음 Virtual DOM → 같은 
 | --- | --- |
 | DOM → VNode | 요소·속성·텍스트 재귀 변환, 공백 보존, 주석 제외, 미지원 노드 종류 오류 처리 구현 |
 | input 상태 읽기 | 텍스트 입력의 현재 `value`, 체크박스의 `value`·`checked` 읽기 구현 |
-| VNode → DOM / Diff / Patch | 미구현 |
+| VNode → DOM | `toDOM` 선언만 있으며, 다음 구현 대상 |
+| Diff / Patch | 미구현 |
 | HTML 편집기 / 미리보기 / 이력 탐색 | 미구현 |
 | Component / State / Hooks | Phase 2 계획 |
 | 자동 테스트 | 미구현. 브라우저 검증 계획은 [테스트 문서](docs/testing.md) 참고 |
+
+다음 단계는 `toDOM`으로 분리된 DOM 노드를 생성하고 `DOM → VNode → DOM` 왕복을 검증하는 것이다. `fromDOM`의 구현과 실제 브라우저 검증 완료는 구분한다. 자세한 함수 경계는 [DOM 변환 설계](docs/architecture.md), 확인 순서는 [다음 검증 순서](docs/testing.md#다음-검증-순서)를 따른다.
 
 ## Getting started
 

@@ -59,4 +59,42 @@ function readInputState(
   return undefined;
 }
 
-/* TODO: toDOM 함수 구현 */
+/* VNode를 분리된 DOM 노드로 변환합니다. */
+export function toDOM(vNode: VNode): Node {
+  switch (vNode.type) {
+    case "text":
+      return document.createTextNode(vNode.value);
+    case "element": {
+      const node = document.createElement(vNode.tag);
+
+      for (const [name, value] of Object.entries(vNode.attrs)) {
+        node.setAttribute(name, value);
+      }
+
+      for (const child of vNode.children) {
+        node.appendChild(toDOM(child));
+      }
+
+      // 속성의 초기값을 적용한 뒤 현재 입력 상태를 복원한다.
+      if (node instanceof HTMLInputElement && vNode.input !== undefined) {
+        writeInputState(node, vNode.input);
+      }
+
+      return node;
+    }
+    default:
+      throw new Error(`Unsupported VNode: ${vNode}`);
+  }
+}
+
+function writeInputState(
+  input: HTMLInputElement,
+  state: { value: string; checked?: boolean },
+): void {
+  if (input.value !== state.value) {
+    input.value = state.value;
+  }
+  if (state.checked !== undefined && input.checked !== state.checked) {
+    input.checked = state.checked;
+  }
+}
