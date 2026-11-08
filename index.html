@@ -1,11 +1,36 @@
 <!doctype html>
-<html lnag="ko">
+<html lang="ko">
   <head>
-    <meta charset="utf-8" />
-    <title>mini-react</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>미니 리액트 텍스트 갱신 데모</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.6; }
+      h1 { line-height: 1.25; }
+      h2 { margin-bottom: .5rem; font-size: 1.15rem; }
+      section { margin-top: 1.5rem; border-top: 1px solid GrayText; }
+      button { font: inherit; padding: .35rem .8rem; cursor: pointer; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    </style>
+    <script type="module" src="./demo.js"></script>
   </head>
   <body>
-    <p id="actual">안녕 <strong>정글</strong>!</p>
-    <script type="module" src="/demo/main.ts"></script>
+    <main>
+      <h1>미니 리액트 텍스트 갱신</h1>
+      <p>버튼을 누르면 현재 DOM과 목표 VDOM을 비교하고, 달라진 텍스트만 화면에 반영합니다.</p>
+      <section aria-labelledby="screen-title">
+        <h2 id="screen-title">실제 화면</h2>
+        <div id="actual">
+          <div aria-live="polite"><p id="count">수량: 1</p><p id="double">두 배: 2</p></div>
+          <button id="add" type="button" disabled>1 추가</button>
+        </div>
+      </section>
+      <section aria-labelledby="changes-title">
+        <h2 id="changes-title">Diff 변경 목록</h2>
+        <p id="patch-result" role="status">첫 변경 대기 중</p>
+        <pre id="changes">[]</pre>
+      </section>
+    </main>
   </body>
 </html>
