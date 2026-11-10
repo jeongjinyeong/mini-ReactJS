@@ -1,19 +1,17 @@
-# 미니 리액트 텍스트 갱신 데모
+# mini-react Phase 1
 
-브라우저에서 같은 상태로부터 수량과 두 배 값을 갱신합니다. `1 추가`를 누르면 현재 DOM을 복사해 기준 VDOM을 만들고, 목표 VDOM과 비교해 달라진 두 텍스트를 실제 DOM에 반영합니다. 화면 아래에서 각 변경의 key, 이전 값, 새 값을 확인할 수 있습니다.
+[데모 HTML](demo/phase1/demo.html)을 Chrome에서 열면 바로 실행됩니다.
 
-## 실행
+1. HTML을 편집해 Virtual DOM의 JavaScript 객체를 확인합니다. 렌더링 결과는 **렌더링 미리보기**에서 볼 수 있습니다.
+2. **Patch**를 눌러 실제 DOM에 반영합니다. 적용한 부분은 빨간색으로 2초간 강조됩니다.
+3. **뒤로 가기**와 **앞으로 가기**로 실제 화면, 편집기, VDOM을 함께 복원합니다.
 
-Node.js가 설치된 상태에서 이 폴더의 터미널에 다음 명령을 입력합니다.
+## 소스와 검증
 
-```powershell
-node serve.js
-```
+- [Phase 1 명세](docs/project-spec.md)에 지원하는 HTML과 VNode, Diff·Patch, 이력 계약이 있습니다.
+- [src/phase1/](src/phase1/)에는 DOM 변환, Diff, Patch 엔진이 있습니다.
+- [demo/phase1/](demo/phase1/)에는 편집기와 데모 화면의 소스가 있습니다.
 
-브라우저에서 [데모 열기](http://127.0.0.1:8000)를 선택한 뒤 `1 추가`를 눌러보세요. 첫 클릭에서 수량은 1에서 2로, 두 배 값은 2에서 4로 바뀝니다. 서버를 종료하려면 터미널에서 `Ctrl+C`를 누릅니다.
+소스를 바꾼 뒤 저장소 루트에서 `node demo/build-demo.js`를 실행하면 단독 실행 HTML이 갱신됩니다.
 
-## 명세
-
-- [VDOM 생성](docs/project-spec.md)
-- [Diff](docs/diff-spec.md)
-- [Patch](docs/patch-spec.md)
+테스트는 저장소 루트에서 `node tests/run-phase1-tests.mjs`로 실행합니다. 설치된 Chrome을 사용하며, [테스트 실행 안내](tests/README.md)에서 실행 옵션을 확인할 수 있습니다.

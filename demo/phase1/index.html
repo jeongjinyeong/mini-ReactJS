@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="HTML 편집 결과를 실제 DOM에 반영하고 VDOM 스냅샷 이력을 탐색하는 mini-react Phase 1 데모">
+  <title>mini-react · Phase 1</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, "Malgun Gothic", sans-serif;
+      --ink: #26273e;
+      --muted: #565972;
+      --line: #dedcf0;
+      --accent: #5036ae;
+      --soft: #eeebfc;
+      --mono: "Cascadia Code", Consolas, "Malgun Gothic", monospace;
+      color: var(--ink);
+      background: #f7f6fc;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; }
+    h1, h2, p, pre { margin: 0; }
+    code, textarea, .eyebrow, .badge { font-family: var(--mono); font-variant-ligatures: none; }
+    .page { width: min(100% - 44px, 1360px); margin-inline: auto; padding: 28px 0; }
+    .eyebrow { color: var(--accent); font-size: .76rem; font-weight: 700; letter-spacing: .13em; }
+    h1 { margin: 5px 0 9px; font-size: clamp(1.9rem, 4.6vw, 3.15rem); line-height: 1.12; letter-spacing: -.04em; }
+    .intro { color: var(--muted); font-size: .94rem; line-height: 1.6; }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 20px 0 14px; padding: 10px 12px; border: 1px solid #ddd4f8; border-radius: 12px; background: #f1edff; }
+    .controls, .history { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    button { min-height: 44px; padding: 7px 13px; border: 1px solid #d7cdf4; border-radius: 8px; background: #fff; color: var(--accent); font: 700 .86rem system-ui, "Malgun Gothic", sans-serif; cursor: pointer; }
+    button:hover:enabled { background: #f8f5ff; }
+    button:focus-visible, textarea:focus-visible, .vdom-code:focus-visible { outline: 2px solid #795bd7; outline-offset: 2px; }
+    button.primary { border-color: var(--accent); background: var(--accent); color: white; }
+    button.primary:hover:enabled { background: #43299e; }
+    button:disabled { cursor: default; background: #eae5f6; border-color: #ded7ef; color: #6c6481; }
+    .history { color: var(--muted); font-size: .8rem; }
+    .badge { padding: 4px 7px; border-radius: 5px; background: white; color: var(--accent); font-weight: 700; }
+    .board { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr) minmax(0, 1.35fr); gap: 13px; }
+    .panel { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: white; }
+    .panel h2, .panel label { color: var(--ink); font-size: 1rem; font-weight: 700; }
+    .caption { color: var(--muted); font-size: .8rem; line-height: 1.55; }
+    .surface, textarea { min-width: 0; flex: 1; min-height: 248px; padding: 10px; border: 1px solid #e3dff2; border-radius: 8px; background: #fbfaff; }
+    .surface { overflow-wrap: anywhere; }
+    .surface :where(h1,h2,h3,p,ul,ol) { margin-block: .45em; }
+    .surface :where(h2) { font-size: 1.16rem; }
+    .surface :where(ul,ol) { padding-left: 24px; }
+    .surface :where(input) { max-width: 100%; }
+    textarea { width: 100%; resize: vertical; color: var(--ink); font-size: .8rem; line-height: 1.58; }
+    .vdom-code { min-height: 248px; max-height: 380px; overflow: auto; padding: 10px; border: 1px solid #e3dff2; border-radius: 8px; background: #f8f6ff; color: #342468; font-size: .79rem; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .rendered-preview { color: var(--muted); font-size: .8rem; }
+    .rendered-preview summary { padding: 4px 0; cursor: pointer; }
+    .rendered-preview .surface { min-height: 0; margin-top: 4px; color: var(--ink); }
+    .message { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; margin-top: 13px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .message > strong { color: var(--accent); font-size: .8rem; }
+    .message p, .error, .hint { font-size: .81rem; line-height: 1.55; }
+    .error { color: #a12035; }
+    .hint { margin-top: 11px; color: var(--muted); }
+    .hint code { background: var(--soft); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+    @media (max-width: 1000px) {
+      .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .editor-panel { grid-column: 1 / -1; grid-row: 1; }
+      .surface { min-height: 150px; }
+    }
+    @media (max-width: 570px) {
+      .page { width: calc(100% - 26px); padding-top: 19px; }
+      .board { grid-template-columns: minmax(0, 1fr); }
+      textarea { min-height: 225px; }
+    }
+  </style>
+  <script type="module" src="./demo.js"></script>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <p class="eyebrow">MINI-REACT · PHASE 01</p>
+      <h1>편집한 HTML을 실제 화면으로</h1>
+      <p class="intro">HTML을 바꾸면 VDOM 객체 코드가 갱신됩니다. Patch로 반영한 화면은 이력에서 다시 열 수 있습니다.</p>
+    </header>
+
+    <div class="toolbar">
+      <div class="controls" role="group" aria-label="변경 적용과 이력 탐색">
+        <button class="primary" id="apply" type="button" disabled>Patch</button>
+        <button id="back" type="button" disabled>뒤로 가기</button>
+        <button id="forward" type="button" disabled>앞으로 가기</button>
+      </div>
+      <div class="history" aria-live="polite" aria-atomic="true">
+        <span>저장된 이력 <strong class="badge" id="history-count">1개</strong></span>
+        <span>현재 위치 <strong class="badge" id="history-position">1 / 1</strong></span>
+      </div>
+    </div>
+
+    <div class="board">
+      <section class="panel" aria-labelledby="real-title">
+        <h2 id="real-title">실제 영역 · Real DOM</h2>
+        <p class="caption">마지막으로 반영된 화면</p>
+        <div class="surface" id="actual" inert><div><section class="fruit-list">
+  <h2>오늘의 과일</h2>
+  <p>좋아요 10</p>
+  <ul>
+    <li data-key="a">포도</li>
+    <li data-key="b">사과</li>
+    <li data-key="c">바나나</li>
+  </ul>
+</section></div></div>
+      </section>
+
+      <section class="panel editor-panel" aria-labelledby="editor-title">
+        <label id="editor-title" for="editor">테스트 영역 · HTML 편집기</label>
+        <p class="caption" id="editor-help">텍스트나 태그, 속성, 목록의 순서를 편집하세요.</p>
+        <textarea id="editor" aria-describedby="editor-help" spellcheck="false" disabled></textarea>
+        <p class="error" id="editor-error" role="alert" hidden></p>
+      </section>
+
+      <section class="panel" aria-labelledby="preview-title">
+        <h2 id="preview-title">Virtual DOM · JS 객체</h2>
+        <p class="caption">편집한 HTML을 변환한 VNode 트리</p>
+        <pre class="vdom-code" tabindex="0" aria-label="Virtual DOM 객체 코드"><code id="vdom-code"></code></pre>
+        <details class="rendered-preview">
+          <summary>렌더링 미리보기</summary>
+          <div class="surface" id="preview" inert></div>
+        </details>
+      </section>
+    </div>
+
+    <div class="message">
+      <strong>변경 결과</strong>
+      <p id="result" role="status">HTML을 편집한 뒤 Patch를 눌러보세요.</p>
+    </div>
+    <p class="hint"><code>data-key</code>가 붙은 두 <code>&lt;li&gt;</code> 줄의 순서를 바꾸고 Patch를 누르면 <code>MOVE</code>를 확인할 수 있습니다.</p>
+    <noscript><p>실습을 실행하려면 JavaScript를 켜 주세요.</p></noscript>
+  </main>
+</body>
+</html>
