@@ -1,9 +1,10 @@
-# Phase 1 브라우저 회귀 테스트
+# mini-react 브라우저 회귀 테스트
 
 저장소 루트에서 Node.js와 설치된 Chrome으로 실행합니다. 추가 패키지가 필요하지 않습니다.
 
 ```powershell
 node tests/run-phase1-tests.mjs
+node tests/run-phase2-tests.mjs
 ```
 
 복사한 테스트로 다른 작업 트리를 검사할 때는 첫 인자에 저장소 경로를 지정합니다. 마지막 인자는 기본값인 all 외에도 standalone 또는 modules를 받을 수 있습니다.
