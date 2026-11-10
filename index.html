@@ -1,11 +1,51 @@
 <!doctype html>
-<html lnag="ko">
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mini-react</title>
+    <link rel="stylesheet" href="/src/demo/style.css" />
   </head>
   <body>
-    <p id="actual">안녕 <strong>정글</strong>!</p>
-    <script type="module" src="/demo/main.ts"></script>
+    <h1>mini-react</h1>
+    <div class="toolbar">
+      <button id="back" type="button">뒤로 가기</button>
+      <button id="forward" type="button">앞으로 가기</button>
+      <output id="status"></output>
+    </div>
+
+    <main>
+      <section class="panel">
+        <h2>테스트 영역 · HTML 편집기</h2>
+        <textarea id="editor" aria-label="HTML 편집기" spellcheck="false"></textarea>
+        <button id="patch" type="button">Patch</button>
+        <p id="error" role="alert"></p>
+        <h3>미리보기</h3>
+        <div id="preview" inert></div>
+      </section>
+
+      <section class="panel">
+        <h2>실제 영역 · Real DOM</h2>
+        <div id="actual" inert>
+<h2>게시글</h2>
+<p class="likes">좋아요 <strong>10</strong></p>
+<button>좋아요</button>
+<ul>
+  <li data-key="grape">포도</li>
+  <li data-key="apple">사과</li>
+  <li data-key="banana">바나나</li>
+</ul>
+<label><input type="checkbox" checked> 알림 받기</label>
+<input value="안녕">
+</div>
+      </section>
+
+      <section class="panel">
+        <h2>Virtual DOM</h2>
+        <pre id="vdom"></pre>
+      </section>
+    </main>
+
+    <script type="module" src="/src/demo/main.ts"></script>
   </body>
 </html>

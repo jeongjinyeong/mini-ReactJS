@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-2026-11-07 기준 Phase 1 파일 골격이 있고 DOM 변환을 작성 중이다. `src/engine/`에는 트리·변경 목록 타입과 구현 위치가 있고, `src/demo/main.ts`는 빈 파일이다. DOM 생성, Diff, Patch, 이력과 자동 테스트는 아직 구현하지 않았다. 브라우저 진입점은 루트 `index.html`, 데모 코드는 `src/demo/`에 둔다. 현재 `index.html`의 스크립트 경로는 `/demo/main.ts`로 남아 있어 `/src/demo/main.ts`로 수정해야 한다. 실행 명령은 README, 테스트 추가 계획은 `tests/README.md`를 참고한다. 검증 결과는 실행한 환경과 실제 출력을 확인해 기록한다.
+2026-11-09 기준 Phase 1의 엔진과 데모가 구현되어 있다. `src/engine/`에 VDOM 타입(`vnode.ts`), `fromDOM`·`toDOM`(`dom.ts`), `diff`(`diff.ts`), `patch`(`patch.ts`)가 있고, `src/demo/`에 편집기·미리보기·이력 탐색 데모(`main.ts`), 이력(`history.ts`), 입력 검증(`validate.ts`)이 있다. 브라우저 진입점은 루트 `index.html`이다. 자동 테스트는 개발 서버의 `/tests/index.html`에서 실행하는 브라우저 테스트(`tests/engine.test.ts`)이며 `npm test`는 아직 설정하지 않았다. 실행 명령은 README, 테스트 실행 방법은 `tests/README.md`를 참고한다. 검증 결과는 실행한 환경과 실제 출력을 확인해 기록한다.
 
 ## 읽는 순서
 
@@ -14,7 +14,7 @@
 
 ## Phase 1 작업 순서
 
-1. 작은 브라우저 샘플에서 `DOM → VTree → DOM` 왕복을 구현하고 혼합 텍스트와 공백을 검증한다.
+1. 작은 브라우저 샘플에서 `DOM → VDOM → DOM` 왕복을 구현하고 혼합 텍스트와 공백을 검증한다.
 2. 텍스트 하나 변경을 Diff → Patch로 연결한다. 대상 밖 형제 노드가 같은 객체인지 확인한다.
 3. 추가·삭제·교체·속성 변경까지 확장하고 입력 컨트롤의 프로퍼티를 검증한다.
 4. 실제 영역, 테스트 영역의 HTML 편집기·미리보기, Patch 버튼, 뒤로·앞으로를 연결한다. 이력 분기와 유효하지 않은 입력을 검증한다.

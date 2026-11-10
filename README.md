@@ -37,16 +37,17 @@ Phase 2   상태 변경 → Component + Hooks → 다음 Virtual DOM → 같은 
 
 ### 현재 구현 상태
 
-현재는 **Phase 1 진행 중**이며, DOM → VNode 변환이 구현되어 있다. 아래의 로드맵은 목표이며, 아직 완성된 프레임워크나 동작하는 편집 데모를 제공하지 않는다.
+현재 **Phase 1의 엔진과 데모가 구현**되어 있다. Phase 2(Component, State, Hooks)는 아직 시작하지 않았다.
 
 | 범위 | 상태 |
 | --- | --- |
-| DOM → VNode | 요소·속성·텍스트 재귀 변환, 공백 보존, 주석 제외, 미지원 노드 종류 오류 처리 구현 |
-| input 상태 읽기 | 텍스트 입력의 현재 `value`, 체크박스의 `value`·`checked` 읽기 구현 |
-| VNode → DOM / Diff / Patch | 미구현 |
-| HTML 편집기 / 미리보기 / 이력 탐색 | 미구현 |
+| DOM → VDOM (`fromDOM`) | 요소·속성·텍스트 재귀 변환, 공백 보존, 주석 제외, `data-key` → `key`, input의 현재 `value`·`checked` 읽기 |
+| VDOM → DOM (`toDOM`) | 구현 |
+| Diff (`diff`) | `INSERT`·`REMOVE`·`REPLACE`·`UPDATE_TEXT`·`UPDATE_PROPS`·`MOVE`, `key` 기반 대응, `key` 중복 오류 |
+| Patch (`patch`) | 경로를 먼저 DOM 노드로 해석한 뒤 변경 대상만 수정 |
+| HTML 편집기 / 미리보기 / 이력 탐색 | 구현. 이력은 최대 10개, 바뀐 영역은 2초간 빨갛게 표시 |
 | Component / State / Hooks | Phase 2 계획 |
-| 자동 테스트 | 미구현. 브라우저 검증 계획은 [테스트 문서](docs/testing.md) 참고 |
+| 자동 테스트 | 브라우저 테스트 페이지(`/tests/index.html`). `npm test`는 미설정 |
 
 ## Getting started
 
@@ -58,11 +59,7 @@ npm ci
 npm run dev
 ```
 
-개발 서버가 출력한 주소의 `/`에서 루트 `index.html`을 연다. 데모 소스는 `src/demo/`에 둔다.
-
-> **현재 실행 경계**
->
-> `src/demo/main.ts`는 빈 파일이며, `index.html`의 스크립트 경로도 아직 `/demo/main.ts`로 남아 있다. `/src/demo/main.ts`로 연결하는 작업과 데모 구현이 필요하다. 위 명령은 개발 서버를 시작하는 절차이며, 완성된 데모 실행을 의미하지 않는다.
+개발 서버가 출력한 주소의 `/`에서 데모를, `/tests/index.html`에서 테스트 결과를 연다. 데모 소스는 `src/demo/`에 둔다.
 
 ### Commands
 
@@ -70,55 +67,65 @@ npm run dev
 | --- | --- |
 | `npm run dev` | 개발 서버 실행 |
 | `npm run check` | TypeScript 타입 검사 |
-| `npm run build` | 타입 검사 후 루트 페이지 빌드. 현재 진입 경로 수정 필요 |
-| `npm test` | 아직 미설정이며 실패 코드로 종료. [테스트 추가 계획](tests/README.md) 참고 |
+| `npm run build` | 타입 검사 후 루트 페이지 빌드 |
+| `npm test` | 아직 미설정이며 실패 코드로 종료. 테스트는 브라우저에서 실행한다. [테스트 안내](tests/README.md) 참고 |
 
 ## Example
 
-현재 구현된 `fromDOM`은 DOM 노드 하나와 그 자손을 `VNode` 데이터로 변환한다. 다음은 브라우저에서 실행하는 TypeScript 예제다.
+`fromDOM`은 DOM 노드 하나와 그 자손을 `VNode` 데이터로 변환한다. `diff`는 두 트리의 차이를 변경 목록으로 만들고, `patch`는 그 목록만큼만 실제 DOM을 고친다. 다음은 브라우저에서 실행하는 TypeScript 예제다.
 
 ```ts
+import { diff } from "./src/engine/diff";
 import { fromDOM } from "./src/engine/dom";
+import { patch } from "./src/engine/patch";
 
-const element = document.createElement("p");
-element.innerHTML = "Hello <strong>Jungle</strong>!";
+const actual = document.createElement("div");
+actual.innerHTML = '<button class="likes">좋아요 10</button>';
+const previous = fromDOM(actual);
 
-const vnode = fromDOM(element);
+const draft = document.createElement("div");
+draft.innerHTML = '<button class="likes">좋아요 11</button>';
+const next = fromDOM(draft);
+
+const changes = diff(previous, next);
+patch(actual, changes); // 기존 button 노드는 그대로 두고 텍스트만 바꾼다.
 ```
 
 ```ts
-// vnode
+// previous
 {
-  type: "element",
-  tag: "p",
-  attrs: {},
+  type: VNodeType.ELEMENT,
+  tagName: "div",
+  props: {},
   children: [
-    { type: "text", value: "Hello " },
     {
-      type: "element",
-      tag: "strong",
-      attrs: {},
-      children: [{ type: "text", value: "Jungle" }],
+      type: VNodeType.ELEMENT,
+      tagName: "button",
+      props: { class: "likes" },
+      children: [{ type: VNodeType.TEXT, value: "좋아요 10" }],
     },
-    { type: "text", value: "!" },
   ],
 }
+
+// changes
+[{ type: "UPDATE_TEXT", path: [0, 0], value: "좋아요 11" }]
 ```
 
-원본 DOM은 수정하지 않는다. HTML 속성은 `attrs`로, 지원하는 input의 현재 프로퍼티는 별도의 `input` 필드로 읽는다. 관리 컨테이너의 직계 자식들을 모은 배열이 `VTree`이며, 컨테이너 자체는 포함하지 않는다.
+원본 DOM은 읽는 동안 수정하지 않는다. 별도의 트리 타입은 없고 루트 `VNode` 하나가 전체 트리를 표현한다. 형제의 순서가 바뀌는 요소는 HTML의 `data-key` 속성으로 `key`를 준다.
 
 ## Roadmap
 
 ### Phase 1 · Virtual DOM, Diff, Patch
 
-- [x] `VNode`·`VTree`·변경 목록 타입 정의
+- [x] `VNode`·변경 목록 타입 정의
 - [x] DOM → VNode 기본 변환과 지원 input 상태 읽기
-- [ ] VNode → DOM 생성 및 왕복 변환 검증
-- [ ] 추가·삭제·교체·텍스트·속성·프로퍼티 변경을 구분하는 Diff
-- [ ] 변경 대상 밖 노드의 객체 참조를 유지하는 Patch
-- [ ] HTML 편집기·미리보기·입력 검증과 Patch 버튼
-- [ ] 초기 스냅샷과 성공한 변경을 저장하는 이력, 뒤로·앞으로 탐색
-- [ ] 모듈 테스트와 브라우저 인수 테스트
+- [x] VNode → DOM 생성 및 왕복 변환 검증
+- [x] 추가·삭제·교체·이동·텍스트·속성·프로퍼티 변경을 구분하는 Diff와 `key` 기반 대응
+- [x] 변경 대상 밖 노드의 객체 참조를 유지하는 Patch
+- [x] HTML 편집기·미리보기·입력 검증과 Patch 버튼
+- [x] 초기 스냅샷과 성공한 변경을 저장하는 이력, 뒤로·앞으로 탐색
+- [x] 모듈 테스트 (브라우저 테스트 페이지)
+- [ ] 브라우저 인수 테스트 P1-E1–P1-E8 전체 기록
 
 예를 들어 `<h1>Hello</h1><p>World</p>`에서 제목만 바꾸면, 제목의 텍스트를 수정하고 기존 `p` 노드는 재사용하는 것이 목표다. 화면이 같다는 것뿐 아니라 **어떤 노드를 왜 유지했는지**도 검증한다.
 

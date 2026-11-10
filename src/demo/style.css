@@ -1,0 +1,69 @@
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 1.4rem;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #999;
+  border-radius: 6px;
+}
+
+.panel h3 {
+  margin: 12px 0 4px;
+  font-size: 0.9rem;
+}
+
+#editor {
+  box-sizing: border-box;
+  width: 100%;
+  height: 260px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+#error {
+  min-height: 1.5em;
+  margin: 4px 0;
+  color: #c00;
+}
+
+#preview,
+#actual {
+  padding: 8px;
+  border: 1px dashed #999;
+}
+
+#vdom {
+  max-height: 560px;
+  margin: 0;
+  overflow: auto;
+  font-size: 0.75rem;
+}
