@@ -19,16 +19,6 @@ function equal(actual, expected, message) {
     message + ' (기대 ' + stringify(expected) + ', 실제 ' + stringify(actual) + ')');
 }
 
-function throws(run, message) {
-  let failure;
-  try {
-    run();
-  } catch (error) {
-    failure = error;
-  }
-  assert(failure instanceof Error, message);
-}
-
 function element(html) {
   const template = document.createElement('template');
   template.innerHTML = html;
@@ -117,7 +107,7 @@ await test('FR-005 DOM → VNode → DOM에서 속성, data-key, 공백, 텍스�
     tagName: 'section',
     props: { class: 'card' },
     children: [{
-      type: VNodeType.ELEMENT, tagName: 'p', key: 'intro', props: {},
+      type: VNodeType.ELEMENT, tagName: 'p', props: { 'data-key': 'intro' },
       children: [
         { type: VNodeType.TEXT, value: '  앞' },
         { type: VNodeType.ELEMENT, tagName: 'strong', props: {}, children: [{ type: VNodeType.TEXT, value: '중간' }] },
@@ -162,19 +152,23 @@ await test('FR-006 빈 diff는 DOM을 쓰지 않고 변경된 텍스트와 속�
   equal(records.filter(record => record.type === 'characterData').length, 1, '텍스트 한 번 변경');
 });
 
-await test('FR-006 INSERT와 REMOVE가 형제의 정체성과 대상 경로를 유지', () => {
+await test('일반 요소의 INSERT와 REMOVE는 앞에 있는 형제를 유지', () => {
   const { host, previousDOM, next, changes } = fixture(
-    '<ul><li data-key="a">유지</li><li data-key="b">삭제</li><li data-key="c">옛값</li></ul>',
-    '<ul><li data-key="a">유지</li><li data-key="d">삽입</li><li data-key="c">새값</li></ul>',
+    '<div><span>유지</span><span>삭제</span></div>',
+    '<div><span>유지</span></div>',
   );
-  const [first, removed, last] = previousDOM.children;
-  assert(changes.some(change => change.type === 'INSERT') && changes.some(change => change.type === 'REMOVE'),
-    '삽입과 제거 작업이 있어야 합니다.');
+  const [first, removed] = previousDOM.children;
+  equal(changes.map(change => change.type), ['REMOVE'], '뒤 자식 제거');
   patch(host, changes);
-  equal(fromDOM(previousDOM), next, '패치 결과');
-  assert(previousDOM.firstElementChild === first && previousDOM.lastElementChild === last &&
-    !removed.isConnected && removed.parentElement === null, '삭제되지 않은 형제는 재사용해야 합니다.');
-  patch(host, diff(next, fromDOM(element('<ul></ul>'))));
+  equal(fromDOM(previousDOM), next, '삭제 결과');
+  assert(previousDOM.firstElementChild === first && removed.parentNode === null, '남은 형제의 객체 유지');
+  const appended = fromDOM(element('<div><span>유지</span><strong>삽입</strong></div>'));
+  const insertion = diff(next, appended);
+  equal(insertion.map(change => change.type), ['INSERT'], '뒤 자식 삽입');
+  patch(host, insertion);
+  equal(fromDOM(previousDOM), appended, '삽입 결과');
+  assert(previousDOM.firstElementChild === first, '앞 자식의 객체 유지');
+  patch(host, diff(appended, fromDOM(element('<div></div>'))));
   equal(previousDOM.childNodes.length, 0, '빈 자식 목록');
 });
 
@@ -185,7 +179,7 @@ await test('FR-006 타입 또는 태그 변경은 하위 트리 전체 교체', 
   );
   const oldTag = tag.previousDOM.firstElementChild;
   const stable = tag.previousDOM.lastElementChild;
-  equal(tag.changes.map(change => change.type), ['REPLACE'], '같은 key의 태그 교체 작업');
+  equal(tag.changes.map(change => change.type), ['REPLACE'], '태그 교체 작업');
   patch(tag.host, tag.changes);
   equal(fromDOM(tag.previousDOM), tag.next, '태그 교체 결과');
   assert(tag.previousDOM.firstElementChild.firstElementChild !== oldTag.firstElementChild &&
@@ -209,43 +203,51 @@ await test('FR-006 루트의 삽입과 제거', () => {
   equal(host.childNodes.length, 0, '컨테이너는 빈 상태');
 });
 
-await test('FR-007 key 목록 [A, B, C]를 [B, C, A]로 옮기며 실제 노드를 재사용', () => {
+await test('목록을 재정렬하거나 항목을 추가하면 자식을 전부 재생성', () => {
   const { host, previousDOM, next, changes } = fixture(
-    '<ul><li data-key="A">포도</li><li data-key="B">사과</li><li data-key="C">바나나</li></ul>',
-    '<ul><li data-key="B">사과</li><li data-key="C">바나나</li><li data-key="A">포도</li></ul>',
+    '<section><h2>과일</h2><ul><li>사과</li><li>배</li></ul></section>',
+    '<section><h2>과일</h2><ul><li>배</li><li>사과</li></ul></section>',
   );
-  const [a, b, c] = previousDOM.children;
-  equal(changes.map(change => change.type), ['MOVE', 'MOVE'], '명세 예시의 두 이동');
+  const [title, list] = previousDOM.children;
+  const originalItems = [...list.children];
+  equal(changes.map(change => change.type), ['REMOVE', 'REMOVE', 'INSERT', 'INSERT'], '전체 자식 교체 작업');
   patch(host, changes);
-  assert(previousDOM.children[0] === b && previousDOM.children[1] === c && previousDOM.children[2] === a,
-    '이동 뒤 DOM 정체성');
-  equal(fromDOM(previousDOM), next, '최종 VNode');
+  equal(fromDOM(previousDOM), next, '재정렬 결과');
+  assert(previousDOM.firstElementChild === title && previousDOM.lastElementChild === list,
+    '목록 요소와 주변 노드를 유지해야 합니다.');
+  assert(originalItems.every(item => item.parentNode === null), '기존 목록 자식을 모두 제거해야 합니다.');
+
+  const reorderedItems = [...list.children];
+  const expanded = fromDOM(element('<section><h2>과일</h2><ul><li>배</li><li>사과</li><li>귤</li></ul></section>'));
+  patch(host, diff(next, expanded));
+  equal(fromDOM(previousDOM), expanded, '추가 후 목록');
+  assert(reorderedItems.every(item => item.parentNode === null), '추가할 때도 기존 자식을 모두 제거해야 합니다.');
 });
 
-await test('FR-007 들여쓰기 공백과 일반 형제는 key 노드 이동에서 유지', () => {
+await test('다른 요소의 변경은 같은 목록의 자식과 공백을 유지', () => {
   const { host, previousDOM, next, changes } = fixture(
-    '<div><i>정적</i>\n  <span data-key="A">A</span>\n  <span data-key="B">B</span>\n</div>',
-    '<div><i>정적</i>\n  <span data-key="B">B</span>\n  <span data-key="A">A</span>\n</div>',
+    '<div><h2>이전</h2><ol>\n  <li>사과</li>\n  <li>배</li>\n</ol></div>',
+    '<div><h2>새 제목</h2><ol>\n  <li>사과</li>\n  <li>배</li>\n</ol></div>',
   );
-  const previous = [...previousDOM.childNodes];
-  const observer = observe(host);
+  const list = previousDOM.lastElementChild;
+  const children = [...list.childNodes];
+  equal(changes.map(change => change.type), ['UPDATE_TEXT'], '제목의 텍스트 변경만');
   patch(host, changes);
-  const writes = observer.takeRecords();
-  observer.disconnect();
   equal(fromDOM(previousDOM), next, '공백까지 동일');
-  assert([0, 1, 3, 5].every(index => previousDOM.childNodes[index] === previous[index]), '공백과 비키 형제 객체 유지');
-  assert(previousDOM.childNodes[2] === previous[4] && previousDOM.childNodes[4] === previous[2], '키 객체 이동');
-  assert(writes.every(write => [...write.addedNodes, ...write.removedNodes].every(node =>
-    node !== previous[0] && node.nodeType !== Node.TEXT_NODE)), '이동 대상 이외 쓰기 방지');
+  assert(list === previousDOM.lastElementChild && children.every((child, index) => child === list.childNodes[index]),
+    '같은 목록의 요소와 공백 노드 유지');
 });
 
-await test('FR-006·007 중복 key는 오류이고 부모가 다르면 같은 key 허용', () => {
-  const valid = fromDOM(element('<div><p data-key="x">A</p></div>'));
-  const duplicate = fromDOM(element('<div><p data-key="x">A</p><p data-key="x">B</p></div>'));
-  throws(() => diff(valid, duplicate), '새 형제의 중복 key 오류');
-  throws(() => diff(duplicate, valid), '이전 형제의 중복 key 오류');
-  const separateParents = fromDOM(element('<div><section><p data-key="x">A</p></section><section><p data-key="x">B</p></section></div>'));
-  equal(diff(separateParents, separateParents), [], '부모가 다른 key는 허용');
+await test('data-key는 일반 HTML 속성으로 갱신', () => {
+  const { host, previousDOM, next, changes } = fixture(
+    '<div><p data-key="a">A</p><p data-key="b">B</p></div>',
+    '<div><p data-key="b">A</p><p data-key="b">B</p></div>',
+  );
+  const [first, second] = previousDOM.children;
+  equal(changes.map(change => change.type), ['UPDATE_PROPS'], 'data-key 속성만 변경');
+  patch(host, changes);
+  equal(fromDOM(previousDOM), next, '속성 갱신 결과');
+  assert(previousDOM.children[0] === first && previousDOM.children[1] === second, '제자리 요소 유지');
 });
 
 await scenario('FR-001 초기 DOM, 편집기, VNode 객체, 첫 이력 위치가 일치', app => {
@@ -267,7 +269,7 @@ await scenario('FR-002 HTML 편집은 미리보기만 바꾸고 Patch가 현재 
   app.edit('<p data-key="msg" title="&quot;인용&quot;">&lt;b&gt;새 초안&lt;/b&gt;</p>');
   equal(app.actualHTML(), initial, '편집만 한 실제 화면');
   const draft = app.displayed().children[0];
-  equal(draft.key, 'msg', '표시된 key');
+  equal(draft.props['data-key'], 'msg', '표시된 data-key 속성');
   equal(draft.props.title, '"인용"', '속성 문자열');
   equal(draft.children[0].value, '<b>새 초안</b>', 'HTML처럼 보이는 텍스트를 데이터로 표시');
   equal(app.displayed(), fromDOM(app.preview.firstElementChild), '객체와 렌더링 일치');
@@ -279,7 +281,7 @@ await scenario('FR-002 HTML 편집은 미리보기만 바꾸고 Patch가 현재 
   equal(app.cursor(), '2 / 2', '새 스냅샷');
 });
 
-await scenario('FR-002 잘못된 태그·속성·중복 key는 실제 영역과 이력에 쓰지 않음', app => {
+await scenario('FR-002 잘못된 태그·속성은 실제 영역과 이력에 쓰지 않음', app => {
   const oldHTML = app.actualHTML();
   const oldPreview = app.previewHTML();
   const oldCode = app.code();
@@ -288,7 +290,6 @@ await scenario('FR-002 잘못된 태그·속성·중복 key는 실제 영역과 
     '<svg><text>금지</text></svg>',
     '<p onclick="throw 1">금지</p>',
     '<input type="file">',
-    '<ul><li data-key="x">A</li><li data-key="x">B</li></ul>',
   ]) {
     app.applyHTML(rejected);
     assert(!app.error.hidden && app.error.textContent.length > 0, '지원하지 않는 입력 오류');

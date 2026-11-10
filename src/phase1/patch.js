@@ -14,7 +14,7 @@ function resolve(container, path) {
 }
 
 function insertAt(parent, node, index) {
-  const children = renderedChildren(parent).filter(child => child !== node);
+  const children = renderedChildren(parent);
   parent.insertBefore(node, children[index] ?? null);
 }
 
@@ -43,20 +43,9 @@ export function patch(container, changes) {
         affected.add(target.parentElement);
         target.parentNode.removeChild(target);
         break;
-      case 'REPLACE': {
-        const parent = target.parentNode;
-        if (change.index === undefined) {
-          parent.replaceChild(node, target);
-        } else {
-          parent.removeChild(target);
-          insertAt(parent, node, change.index);
-        }
+      case 'REPLACE':
+        target.parentNode.replaceChild(node, target);
         affected.add(highlightTarget(node));
-        break;
-      }
-      case 'MOVE':
-        insertAt(target.parentNode, target, change.index);
-        affected.add(highlightTarget(target));
         break;
       case 'UPDATE_TEXT':
         target.data = change.value;

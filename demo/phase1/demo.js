@@ -1,4 +1,4 @@
-import { fromDOM, toDOM, validateKeys, VNodeType } from '../../src/phase1/vnode.js';
+import { fromDOM, toDOM, VNodeType } from '../../src/phase1/vnode.js';
 import { diff } from '../../src/phase1/diff.js';
 import { patch } from '../../src/phase1/patch.js';
 
@@ -61,9 +61,7 @@ function parseDraft(html) {
   for (const comment of skipped) comment.remove();
   wrapper.normalize();
 
-  const tree = fromDOM(wrapper);
-  validateKeys(tree);
-  return tree;
+  return fromDOM(wrapper);
 }
 
 function showError(message = '') {
@@ -86,13 +84,12 @@ function formatVNode(node, depth = 0) {
     return indent + '{ type: ' + node.type + ', value: ' + JSON.stringify(node.value) + ' }';
   }
 
-  const key = node.key === undefined ? '' : ', key: ' + JSON.stringify(node.key);
   const children = node.children.length
     ? '[\n' + node.children.map(child => formatVNode(child, depth + 2)).join(',\n') + '\n' + indent + '  ]'
     : '[]';
 
   return [
-    indent + '{ type: ' + node.type + ', tagName: ' + JSON.stringify(node.tagName) + key + ',',
+    indent + '{ type: ' + node.type + ', tagName: ' + JSON.stringify(node.tagName) + ',',
     indent + '  props: ' + JSON.stringify(node.props) + ',',
     indent + '  children: ' + children,
     indent + '}',
