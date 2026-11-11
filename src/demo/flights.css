@@ -1,0 +1,182 @@
+/* 항공편 안내판: 어두운 갈색 판 위에 글자 하나가 한 칸인 플랩이 줄지어 있다. */
+:root {
+  --wall: #1a1713;
+  --board: #2a251e;
+  --tile: #3d362c;
+  --tile-edge: #1f1b16;
+  --seam: #17140f;
+  --ink: #f5f3ee;
+  --dim: #a3998a;
+  --warn: #ffb347;
+  --go: #9fe29f;
+}
+
+html {
+  background: var(--wall);
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.airport {
+  box-sizing: border-box;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  /* 플랩 크기의 기준. 화면 폭에 맞춰 줄어든다. */
+  font-size: clamp(9px, 1.6vw, 20px);
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.9em;
+  letter-spacing: 0.12em;
+}
+
+h1 small {
+  font-size: 0.5em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--dim);
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: max(12px, 0.62em);
+  color: var(--dim);
+}
+
+.hint a {
+  color: inherit;
+}
+
+/* 플랩 */
+.flaps {
+  display: inline-flex;
+  gap: 0.14em;
+}
+
+.flap {
+  position: relative;
+  display: inline-grid;
+  box-sizing: border-box;
+  width: 1.08em;
+  height: 1.55em;
+  place-items: center;
+  border: 1px solid var(--tile-edge);
+  border-radius: 0.1em;
+  background: linear-gradient(#463e33, var(--tile) 49%, #352f26 51%, #3a332a);
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 1;
+  white-space: pre;
+  backface-visibility: hidden;
+}
+
+/* 위아래 판 사이의 이음매 */
+.flap::after {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--seam);
+  content: "";
+}
+
+.flaps.warn .flap {
+  color: var(--warn);
+}
+
+.flaps.go .flap {
+  color: var(--go);
+}
+
+/* 시계 */
+.clock {
+  display: flex;
+  gap: 0.15em;
+  align-items: center;
+  font-size: 2.1em;
+}
+
+.dial {
+  display: inline-flex;
+  padding: 0.12em;
+  border-radius: 0.14em;
+  cursor: ns-resize;
+  outline: 2px solid transparent;
+  touch-action: none;
+}
+
+.dial:hover,
+.dial:focus-visible {
+  outline-color: var(--warn);
+}
+
+.colon {
+  font-weight: 700;
+  color: var(--dim);
+}
+
+/* 판 */
+.board {
+  padding: 1em 1.1em 1.2em;
+  overflow-x: auto;
+  border: 1px solid #0d0b09;
+  border-radius: 0.5em;
+  background: var(--board);
+  /* 판은 화면 폭을 채울 만큼 키운다(판 전체 폭이 약 55em). 넓은 화면에서는 26px까지 커진다. */
+  font-size: clamp(9px, calc((100vw - 52px) / 55), 26px);
+  box-shadow: inset 0 0 2.5em rgba(0, 0, 0, 0.45);
+}
+
+.board ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 열 너비는 플랩 개수로 정한다: 한 칸(1.08 × 1.15em)과 사이 0.14em. n칸 = n × 1.382em - 0.14em */
+.row {
+  --cell: 1.382em;
+  display: grid;
+  grid-template-columns:
+    calc(var(--cell) * 5 - 0.14em)
+    calc(var(--cell) * 12 - 0.14em)
+    calc(var(--cell) * 5 - 0.14em)
+    calc(var(--cell) * 3 - 0.14em)
+    calc(var(--cell) * 11 - 0.14em);
+  gap: 0 0.9em;
+  width: max-content;
+  padding: 0.16em 0;
+}
+
+.row.head {
+  padding-bottom: 0.5em;
+  color: var(--dim);
+}
+
+/* 머리글은 글자만 작게 한다. 줄의 글자 크기는 그대로여서 열 너비가 본문과 같다. */
+.row.head span {
+  font-size: max(10px, 0.6em);
+  letter-spacing: 0.18em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dial {
+    transition: outline-color 0.15s;
+  }
+}

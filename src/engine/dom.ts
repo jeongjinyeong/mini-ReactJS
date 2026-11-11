@@ -56,9 +56,14 @@ export function toDOM(vnode: VNode, doc: Document = document): Node {
   return element;
 }
 
-/* boolean은 DOM 프로퍼티로, string은 HTML 속성으로 쓴다.
+/* 함수는 이벤트 핸들러 프로퍼티로, boolean은 DOM 프로퍼티로, string은 HTML 속성으로 쓴다.
+   핸들러는 프로퍼티 하나에 대입하므로 다시 렌더링해도 요소당 하나만 남는다.
    input의 value는 사용자가 입력한 뒤에는 속성만 바꿔서는 화면이 바뀌지 않으므로 프로퍼티도 쓴다. */
 export function setProp(element: Element, name: string, value: PropValue): void {
+  if (typeof value === "function") {
+    Reflect.set(element, name.toLowerCase(), value);
+    return;
+  }
   if (typeof value === "boolean") {
     element.toggleAttribute(name, value);
     Reflect.set(element, name, value);
@@ -68,6 +73,10 @@ export function setProp(element: Element, name: string, value: PropValue): void 
   if (name === "value" && element.localName === "input") {
     (element as HTMLInputElement).value = value;
   }
+}
+
+export function removeHandler(element: Element, name: string): void {
+  Reflect.set(element, name.toLowerCase(), null);
 }
 
 export function removeProp(element: Element, name: string): void {

@@ -4,13 +4,15 @@
 
 ## 레포 구조
 
-아래는 Phase 1의 파일 배치 계획이다. 최상위 `src/`, `tests/`, `docs/`를 사용하고, 엔진과 데모 코드는 각각 `src/engine/`, `src/demo/`에 둔다. 브라우저 진입점은 루트 `index.html`이며 `/src/demo/main.ts`를 불러온다.
+최상위 `src/`, `tests/`, `docs/`를 사용하고, 엔진과 데모 코드는 각각 `src/engine/`, `src/demo/`에 둔다. 브라우저 진입점은 두 개다. 루트 `index.html`은 Phase 1 데모(`/src/demo/main.ts`), `phase2.html`은 Phase 2 데모(`/src/demo/cart.ts`)를 불러온다.
 
 ```text
 mini-react/
 ├─ README.md
 ├─ AGENTS.md
-├─ index.html
+├─ index.html          # Phase 1 데모
+├─ phase2.html         # Phase 2 데모
+├─ vite.config.ts      # 두 페이지를 함께 빌드
 ├─ docs/
 │  ├─ requirements.md
 │  ├─ architecture.md
@@ -20,21 +22,24 @@ mini-react/
 │  │  ├─ vnode.ts
 │  │  ├─ dom.ts
 │  │  ├─ diff.ts
-│  │  └─ patch.ts
+│  │  ├─ patch.ts
+│  │  ├─ history.ts
+│  │  └─ component.ts
 │  └─ demo/
-│     ├─ main.ts
-│     ├─ history.ts
+│     ├─ main.ts       # Phase 1: 편집기·미리보기·이력 탐색
 │     ├─ validate.ts
+│     ├─ cart.ts       # Phase 2: 과일 장바구니와 검사 화면
+│     ├─ highlight.ts
 │     └─ style.css
 └─ tests/
    ├─ index.html
    └─ engine.test.ts
 ```
 
-- `src/engine/`은 Virtual DOM 타입, DOM 변환, Diff, Patch를 제공한다. `diff.ts`는 브라우저 DOM 없이 동작한다.
-- 루트 `index.html`은 샘플 HTML과 데모 진입 모듈을 연결한다. `src/demo/`는 편집기와 미리보기, 입력 검증, Patch 버튼, 이력 탐색을 맡는다. 의존 방향은 `demo → engine`이며 엔진은 데모를 가져오지 않는다.
-- `tests/`는 브라우저 테스트 페이지와 엔진·이력·입력 검증 테스트를 담는다.
-- Phase 2에서 `src/runtime/`을 추가해 함수형 컴포넌트와 Hooks를 구현하고 같은 엔진을 재사용한다.
+- `src/engine/`은 Virtual DOM 타입, DOM 변환, Diff, Patch, 이력, 컴포넌트와 Hook을 제공한다. `diff.ts`는 브라우저 DOM 없이 동작한다.
+- `src/demo/`는 두 데모의 화면을 맡는다. 의존 방향은 `demo → engine`이며 엔진은 데모를 가져오지 않는다.
+- `tests/`는 브라우저 테스트 페이지와 엔진·이력·입력 검증·컴포넌트·Hook 테스트를 담는다.
+- Phase 2의 컴포넌트와 Hook은 `src/engine/component.ts` 한 파일에 있고 같은 Diff와 Patch를 재사용한다.
 
 ## Phase 1 · 흐름과 경계
 
@@ -73,7 +78,8 @@ enum VNodeType {
   TEXT = 3,
 }
 
-type PropValue = string | boolean
+type EventHandler = (event: Event) => void
+type PropValue = string | boolean | EventHandler
 type Props = { [name: string]: PropValue }
 
 interface VNode {
@@ -95,7 +101,7 @@ interface VText extends VNode {
 ```
 
 - `VElement.type`은 반드시 `ELEMENT`, `VText.type`은 반드시 `TEXT`다. 타입 선언에 더해 `createElement()`, `createText()`로만 만들어 이를 보장하고, `isElement()`, `isText()`로 구분한다.
-- `props`의 값이 `string`이면 HTML 속성, `boolean`이면 DOM 프로퍼티다. 이벤트 핸들러(함수)는 Phase 2에서 `PropValue`에 추가한다.
+- `props`의 값이 `string`이면 HTML 속성, `boolean`이면 DOM 프로퍼티다. 함수이면 이벤트 핸들러이며 `onClick`처럼 `on`으로 시작하는 이름을 쓰고, DOM에는 소문자 프로퍼티(`onclick`)에 대입한다. 프로퍼티는 요소마다 하나이므로 다시 렌더링해도 핸들러가 겹쳐 등록되지 않는다. `fromDOM`은 핸들러를 읽지 않으며, Phase 1 편집기는 `on*` 속성을 계속 거절한다.
 - `key`는 HTML의 `data-key` 속성에서 읽어 `VElement.key`에 담고 `props`에는 넣지 않는다. `toDOM`은 `key`를 다시 `data-key` 속성으로 쓴다. 같은 부모의 형제 사이에서만 유일하면 된다.
 
 ### 변경 목록과 경로
@@ -111,6 +117,7 @@ type Patch =
   | { type: "REPLACE"; path: Path; node: VNode }
   | { type: "UPDATE_TEXT"; path: Path; value: string }
   | { type: "UPDATE_PROPS"; path: Path; set: Props; remove: string[] }
+  | { type: "UPDATE_HANDLERS"; path: Path; set: Props; remove: string[] }
   | { type: "MOVE"; path: Path; index: number }
 ```
 
@@ -118,6 +125,7 @@ type Patch =
 - `INSERT`의 `path`는 새 자식이 들어갈 기존 부모이고 `index`는 새 자식 목록에서의 위치다. `MOVE`의 `path`는 옮길 기존 노드이고 `index`는 같은 부모 안의 새 위치다. 나머지 작업의 `path`는 기존 대상 노드를 가리킨다.
 - 예를 들어 `<h1>Hello</h1><p>World</p>`에서 제목만 `Hi`로 바꾸면 `[{ type: "UPDATE_TEXT", path: [0, 0], value: "Hi" }]`가 나온다.
 - `UPDATE_PROPS`는 바뀌거나 새로 생긴 값을 `set`에, 사라진 이름을 `remove`에 담는다.
+- `UPDATE_HANDLERS`는 같은 모양으로 이벤트 핸들러(함수 값)만 담는다. 컴포넌트를 다시 실행하면 핸들러는 매번 새 함수가 되므로 화면 변경과 구분한다. `patch()`는 핸들러를 교체하되 반환하는 "바뀐 노드"에 넣지 않고, 이 패치만 있는 갱신은 "변경 없음"으로 취급한다.
 
 - HTML 요소 이름은 `localName`으로 읽는다. 자식은 `childNodes`에서 요소와 텍스트를 순서대로 읽는다. `children`만 읽으면 `<p>Hello <strong>Jungle</strong>!</p>`의 앞뒤 텍스트와 공백을 잃는다. DOM을 읽을 때와 Patch의 경로를 해석할 때 같은 기준으로 주석을 건너뛰고 공백만 있는 텍스트 노드까지 포함한다. [MDN · childNodes](https://github.com/mdn/content/blob/main/files/en-us/web/api/node/childnodes/index.md)
 - `input`은 HTML 속성 대신 현재 프로퍼티를 `props`에 담는다. 체크박스·라디오는 체크된 경우에만 `checked: true`를, 그 밖의 input은 현재 `.value`를 `value`에 담는다. 쓸 때는 속성과 프로퍼티를 함께 쓴다. 사용자가 입력한 뒤에는 속성만 바꿔서는 화면이 바뀌지 않기 때문이다. [HTML Standard · input](https://html.spec.whatwg.org/multipage/input.html#the-input-element)
@@ -176,7 +184,7 @@ const history: VNode[] = [initialTree]
 let cursor: number = 0
 ```
 
-이력은 데모가 소유한다. 최대 10개를 저장하고, 넘으면 가장 오래된 스냅샷부터 버린다. 첫 스냅샷은 항상 있고, `cursor`는 `0` 이상 `history.length` 미만이다. 이력을 탐색할 때는 `history[cursor]`와 목적지 스냅샷을 Diff하고, Patch가 성공하면 인덱스만 옮긴다. 두 트리가 같아 변경 목록이 비었더라도 유효한 이력 이동이면 목적지로 이동한다.
+이력 자료구조와 저장 규칙은 `src/engine/history.ts`에 있다(`createHistory`, `pushHistory`). Phase 1에서는 데모가, Phase 2에서는 `FunctionComponent`가 이력을 하나씩 가진다. 뒤로·앞으로 탐색은 Phase 1 데모에만 있다. 최대 10개를 저장하고, 넘으면 가장 오래된 스냅샷부터 버린다. 첫 스냅샷은 항상 있고, `cursor`는 `0` 이상 `history.length` 미만이다. 이력을 탐색할 때는 `history[cursor]`와 목적지 스냅샷을 Diff하고, Patch가 성공하면 인덱스만 옮긴다. 두 트리가 같아 변경 목록이 비었더라도 유효한 이력 이동이면 목적지로 이동한다.
 
 | 동작 | 이력 | `cursor` |
 | --- | --- | --- |
@@ -250,13 +258,62 @@ sequenceDiagram
 탐색 중에는 이력 배열을 그대로 유지한다. 목적지가 유효하면 변경 목록이 비어 있어도 인덱스를 옮기고 테스트 영역을 복원한다.
 
 ## Phase 2 · 같은 엔진에 상태를 연결
-`FunctionComponent` 인스턴스가 `hooks` 배열과 현재 Virtual DOM을 가진다. `mount()`에서 루트 함수를 실행해 최초 트리를 붙인다. `update()`에서는 Hook 인덱스를 0으로 되돌린 후 루트 함수를 실행해 다음 트리를 얻고, Diff → Patch를 수행한다. 루트 함수는 새로 호출되어도 Hook 슬롯은 같은 인스턴스에 남는다.
 
-| Hook        | 슬롯이 보관하는 값    | 동작                                                      |
-| ----------- | ------------- | ------------------------------------------------------- |
-| `useState`  | 현재 상태         | setter는 해당 슬롯을 변경하고 루트 갱신을 요청한다.                        |
-| `useEffect` | 이전 의존성, 정리 함수 | 첫 마운트나 의존성 변경의 경우 DOM 반영 후 실행한다. 재실행 전에 이전 정리 함수를 호출한다. |
-| `useMemo`   | 이전 의존성, 계산 결과 | 의존성이 같으면 결과를 재사용한다. 의존성이 바뀌면 렌더 중 다시 계산한다.              |
-|             |               |                                                         |
+Phase 1은 HTML 초안을 읽어 다음 트리를 만들었다. Phase 2는 **컴포넌트 함수를 실행해** 다음 트리를 만든다. 그 뒤의 Diff → Patch → 이력 저장은 같은 코드다. 구현은 `src/engine/component.ts`에 있다.
 
-의존성 배열 비교는 길이와 각 원소의 `Object.is`를 기준으로 삼는다. 루트에서 Hook 호출 순서가 일정해야 같은 슬롯을 읽을 수 있다. 자식은 props를 받아 Virtual DOM을 반환하고, 전달받은 콜백으로 루트의 상태 변경을 요청한다. Phase 2 이벤트 연결의 세부 구현은 그 단계에서 정한다. 이벤트 함수는 편집 가능한 HTML 속성과 별도로 다룬다.
+```mermaid
+flowchart LR
+    E["클릭 → 이벤트 핸들러"] --> S["루트의 useState setter"]
+    S --> U["update() 예약 (한 번)"]
+    U --> R["루트 컴포넌트 실행 → 자식에 props 전달"]
+    R --> N["새 VDOM"]
+    H["직전에 반영한 VDOM"] --> F["Diff"]
+    N --> F
+    F --> P["Patch"]
+    P --> X["이력 저장 → Effect 실행"]
+```
+
+### 컴포넌트와 `h`
+
+```ts
+type Component<P> = (props: P) => VNode
+
+h("li", { class: "row", key: id }, "포도", count)   // 요소
+h(FruitRow, { id, name, count, onAdd })             // 컴포넌트
+```
+
+- 컴포넌트는 props 객체 하나를 받아 `VNode` 하나를 반환하는 함수다. 이름은 대문자로 시작해야 하며 아니면 `h`가 오류를 던진다. JSX는 쓰지 않고 `h`를 직접 호출한다.
+- `h(태그, props, ...자식)`은 요소를 만든다. 자식의 문자열·숫자는 텍스트가 되고, `null`·`undefined`·`boolean`은 건너뛰며(조건부 표시), 배열은 펼친다(목록). `props.key`는 `VElement.key`로 옮긴다.
+- `h(컴포넌트, props)`는 그 함수를 바로 호출해 반환된 `VNode`를 돌려준다. 그래서 VDOM에는 컴포넌트가 남지 않고 요소와 텍스트만 있으며 Diff는 Phase 1 그대로다. 목록의 `key`는 자식 컴포넌트가 자기 루트 요소에 지정한다.
+- `h`는 호출 중인 컴포넌트를 기록한다. 이 기록으로 "지금 자식을 실행 중인가"를 판단하고, 데모에 보여 줄 컴포넌트 트리와 props(`FunctionComponent.tree`)를 만든다. 자식을 `h` 없이 `FruitRow(props)`로 직접 부르면 이 판단을 할 수 없다.
+
+### `FunctionComponent`
+
+루트 컴포넌트 함수 하나와 컨테이너 요소를 받아 `hooks` 배열, 화면의 DOM, 이력을 가진다. 루트 컴포넌트는 props를 받지 않는다.
+
+| 메서드 | 동작 |
+| --- | --- |
+| `mount()` | 루트를 실행해 첫 VDOM을 만들고 `toDOM`으로 컨테이너에 붙인다. 그 VDOM이 비교 기준이자 이력의 첫 항목이 된다. 그 뒤 Effect를 실행한다. |
+| `update()` | Hook 번호를 0으로 되돌리고 루트를 다시 실행한다. `history[cursor]`와 새 VDOM을 Diff하고 Patch한다. `UPDATE_HANDLERS` 외의 변경이 있으면 새 VDOM을 이력에 저장하고(Phase 1과 같은 규칙, 최대 10개), 없으면 새 VDOM을 버리고 기준과 이력을 그대로 둔다. 그 뒤 Effect를 실행하고 `{ previous, next, patches, changed }`를 반환한다. |
+| `unmount()` | 남은 cleanup을 실행하고 DOM, Hook, 이력을 버린다. |
+
+화면은 `update()`로만 바뀐다. 사용자가 화면의 DOM을 직접 고쳐도 엔진은 그 DOM을 다시 읽지 않으므로 상태와 VDOM에 반영되지 않는다.
+
+### Hook
+
+Hook은 호출 순서로 자기 칸을 찾는다. 렌더링을 시작할 때 번호를 0으로 두고 Hook을 호출할 때마다 1씩 올리며, 그 번호가 `hooks` 배열의 인덱스다.
+
+| Hook | 칸이 보관하는 값 | 동작 |
+| --- | --- | --- |
+| `useState(initial)` | 현재 값, setter | 초기값은 첫 렌더링에서만 쓴다. setter는 값 또는 `prev => next` 함수를 받아 자기 칸을 바꾸고 갱신을 예약한다. `Object.is`로 같은 값이면 아무것도 하지 않는다. |
+| `useEffect(fn, deps?)` | 이전 의존 값, cleanup | Patch가 끝난 뒤 실행한다. `deps`가 없으면 매 렌더링 뒤, `[]`이면 mount 뒤 한 번, 값이 있으면 값이 바뀐 렌더링 뒤다. 다시 실행하기 전에 이전 cleanup을 먼저 실행하고, 제거할 때 마지막 cleanup을 실행한다. |
+| `useMemo(fn, deps)` | 이전 의존 값, 계산 결과 | 의존 값이 같으면 계산을 건너뛰고 저장한 결과를 돌려준다. |
+
+- 의존 값 비교는 배열 길이와 각 원소의 `Object.is`다.
+- setter는 값을 즉시 저장하고 `update()`는 마이크로태스크로 한 번만 예약한다. 한 핸들러에서 setter를 여러 번 불러도 화면 갱신은 한 번이다.
+- 다음 경우는 오류다: 렌더링 밖에서 Hook 호출, 자식 컴포넌트에서 Hook 호출, mount 이후 Hook 개수나 종류(순서)가 달라짐.
+- 사용자 정의 Hook은 `use`로 시작하는 보통 함수이며 안에서 내장 Hook을 호출한다. 엔진에 따로 등록하지 않는다. 안에서 부른 내장 Hook이 호출 순서대로 칸을 차지하므로 위 제약이 그대로 적용된다.
+
+### Phase 2 데모
+
+`phase2.html`의 과일 장바구니는 `App`(상태 `cart`, `onlyInCart`)이 `FilterTabs`, `FruitRow`, `CartSummary`에 값과 콜백을 props로 내려 준다. 화면 옆에 컴포넌트 트리와 props, 루트의 Hook 저장소, Hook 실행 기록, Diff 결과, 이전·반영된 VDOM과 실제 DOM을 보여 준다. 검사 화면은 `FunctionComponent`의 `tree`, `hooks`, `history`, `onUpdate`, `onTrace`를 읽기만 한다.

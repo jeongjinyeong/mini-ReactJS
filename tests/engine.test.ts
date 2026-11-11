@@ -1,6 +1,7 @@
 /* 브라우저에서 실행하는 테스트. 개발 서버의 /tests/index.html 에서 결과를 본다. */
-import { HISTORY_LIMIT, createHistory, pushHistory } from "../src/demo/history";
+import { HISTORY_LIMIT, createHistory, pushHistory } from "../src/engine/history";
 import { validateDraft } from "../src/demo/validate";
+import { FunctionComponent, h, useEffect, useMemo, useState } from "../src/engine/component";
 import { diff } from "../src/engine/diff";
 import type { Patch } from "../src/engine/diff";
 import { fromDOM, toDOM } from "../src/engine/dom";
@@ -400,6 +401,317 @@ test("validateDraft: 허용 범위 밖의 태그·속성·input 타입을 거절
   assertThrows(() => check('<input type="file">'), "file input을 거절하지 않았다");
   assertThrows(() => check("<input checked>"), "텍스트 input의 checked를 거절하지 않았다");
   assertThrows(() => check("<svg></svg>"), "svg를 거절하지 않았다");
+});
+
+/* ───────── Phase 2: 컴포넌트와 Hook ───────── */
+
+async function testAsync(name: string, run: () => Promise<void>): Promise<void> {
+  let failure: unknown;
+  await run().catch((error: unknown) => {
+    failure = error ?? new Error("실패");
+  });
+  test(name, () => {
+    if (failure) throw failure;
+  });
+}
+
+/* 예약된 update()가 끝날 때까지 기다린다. */
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve));
+}
+
+/* 함수(핸들러)를 뺀 VDOM. fromDOM 결과와 비교할 때 쓴다. */
+function plain(tree: VNode): unknown {
+  return JSON.parse(JSON.stringify(tree));
+}
+
+function mountApp(App: () => VNode): { app: FunctionComponent; container: HTMLElement; updates: () => number } {
+  const container = document.createElement("div");
+  const app = new FunctionComponent(App, container);
+  let updates = 0;
+  app.onUpdate = () => {
+    updates += 1;
+  };
+  app.mount();
+  return { app, container, updates: () => updates };
+}
+
+test("h: 문자열·숫자는 텍스트로, 배열은 펴고, null·false는 건너뛰며 key를 꺼낸다", () => {
+  const tree = h("ul", { class: "list", key: "k" }, "a", 1, null, false, [h("li", null, "x"), [h("li")]]);
+  assertEqual(tree, el("ul", { class: "list" }, [text("a"), text("1"), el("li", {}, [text("x")]), el("li")], "k"));
+});
+
+test("h: 컴포넌트는 props 객체를 넘겨 호출하고, 이름이 소문자로 시작하면 오류다", () => {
+  function Label({ value, unit = "개" }: { value: number; unit?: string }): VNode {
+    return h("span", null, `${value}${unit}`);
+  }
+  const lower = (): VNode => h("p");
+  assertEqual(h(Label, { value: 3 }), el("span", {}, [text("3개")]));
+  assertThrows(() => h(lower, {}), "소문자 컴포넌트를 거절하지 않았다");
+});
+
+test("diff/patch: 핸들러만 달라지면 UPDATE_HANDLERS 하나이고 화면 변경은 없다. 클릭하면 새 핸들러만 한 번 실행된다", () => {
+  const calls: string[] = [];
+  const before = h("button", { onClick: () => calls.push("이전") }, "+1");
+  const after = h("button", { onClick: () => calls.push("새") }, "+1");
+  const button = toDOM(before) as HTMLButtonElement;
+  const patches = diff(before, after);
+  assertEqual(types(patches), ["UPDATE_HANDLERS"]);
+  assertEqual(patch(button, patches), []);
+  button.click();
+  assertEqual(calls, ["새"]);
+  patch(button, diff(after, h("button", null, "+1")));
+  button.click();
+  assertEqual(calls, ["새"], "제거한 핸들러가 실행되었다");
+});
+
+test("mount: useState 초기값이 화면에 나오고, 첫 VDOM이 첫 이력이며 실제 DOM과 일치한다", () => {
+  function Row({ name, count }: { name: string; count: number }): VNode {
+    return h("li", null, `${name} ${count}개`);
+  }
+  function App(): VNode {
+    const [count] = useState(1);
+    return h("ul", null, h(Row, { name: "사과", count }));
+  }
+  const { app, container } = mountApp(App);
+  assertEqual(container.innerHTML, "<ul><li>사과 1개</li></ul>");
+  assertEqual(app.history!.entries.length, 1);
+  assertEqual(fromDOM(container.firstChild!), plain(app.history!.entries[0]));
+  assertEqual(app.tree, { name: "App", props: {}, children: [{ name: "Row", props: { name: "사과", count: 1 }, children: [] }] });
+  assertEqual(app.hooks.map((hook) => hook.kind), ["state"]);
+});
+
+await testAsync("update: 클릭 한 번에 핸들러 한 번, update 한 번. 바뀐 텍스트만 쓰고 나머지 노드는 그대로다", async () => {
+  let handled = 0;
+  function App(): VNode {
+    const [count, setCount] = useState(0);
+    const add = (): void => {
+      handled += 1;
+      setCount(count + 1);
+    };
+    return h("div", null, h("p", null, `${count}개`), h("button", { onClick: add }, "+1"));
+  }
+  const { app, container, updates } = mountApp(App);
+  const paragraph = container.querySelector("p")!;
+  const button = container.querySelector("button")!;
+
+  button.click();
+  await flush();
+  assertEqual([handled, updates(), paragraph.textContent], [1, 1, "1개"]);
+  assert(container.querySelector("p") === paragraph && container.querySelector("button") === button, "노드를 재사용하지 않았다");
+  assertEqual(app.history!.entries.length, 2);
+
+  button.click(); // 다시 렌더링한 뒤에도 한 번만 실행되고 최신 상태를 본다.
+  await flush();
+  assertEqual([handled, updates(), paragraph.textContent], [2, 2, "2개"]);
+});
+
+await testAsync("useState: 한 핸들러에서 여러 번 바꿔도 update는 한 번이고, 함수를 넘기면 누적된다", async () => {
+  function App(): VNode {
+    const [count, setCount] = useState(0);
+    const twiceByValue = (): void => {
+      setCount(count + 1);
+      setCount(count + 1);
+    };
+    const twiceByFunction = (): void => {
+      setCount((previous) => previous + 1);
+      setCount((previous) => previous + 1);
+    };
+    return h("div", null, h("p", null, String(count)),
+      h("button", { id: "value", onClick: twiceByValue }, "값"),
+      h("button", { id: "function", onClick: twiceByFunction }, "함수"));
+  }
+  const { container, updates } = mountApp(App);
+  const click = (id: string): void => container.querySelector<HTMLButtonElement>(`#${id}`)!.click();
+
+  click("value");
+  await flush();
+  assertEqual([container.querySelector("p")!.textContent, updates()], ["1", 1]);
+  click("function");
+  await flush();
+  assertEqual([container.querySelector("p")!.textContent, updates()], ["3", 2]);
+});
+
+await testAsync("useState: 호출 순서로 상태를 구분하고, 같은 값을 넣으면 update하지 않는다", async () => {
+  let setters: [(value: number) => void, (value: string) => void] | undefined;
+  function App(): VNode {
+    const [count, setCount] = useState(0);
+    const [name, setName] = useState("익명");
+    setters = [setCount, setName];
+    return h("p", null, `${name} ${count}`);
+  }
+  const { app, container, updates } = mountApp(App);
+  setters![1]("정글");
+  await flush();
+  assertEqual(container.textContent, "정글 0");
+  assertEqual(app.hooks.map((hook) => hook.kind === "state" && hook.value), [0, "정글"]);
+  setters![0](0);
+  await flush();
+  assertEqual(updates(), 1, "같은 값인데 update했다");
+});
+
+await testAsync("update: 상태가 달라도 VDOM이 같으면 DOM 쓰기 0건, 이력 유지. 핸들러는 최신 상태를 본다", async () => {
+  const seen: number[] = [];
+  let setHidden: ((value: number) => void) | undefined;
+  function App(): VNode {
+    const [hidden, set] = useState(0);
+    setHidden = set;
+    return h("button", { onClick: () => seen.push(hidden) }, "기록");
+  }
+  const { app, container } = mountApp(App);
+  const baseline = app.history!.entries[0];
+  const observer = new MutationObserver(() => {});
+  observer.observe(container, { subtree: true, childList: true, attributes: true, characterData: true });
+
+  setHidden!(7);
+  await flush();
+  assertEqual(observer.takeRecords().length, 0, "DOM 쓰기가 있었다");
+  observer.disconnect();
+  assert(app.history!.entries.length === 1 && app.history!.entries[0] === baseline, "이력이 바뀌었다");
+  container.querySelector("button")!.click();
+  assertEqual(seen, [7]);
+});
+
+await testAsync(`update: 이력은 최대 ${HISTORY_LIMIT}개다`, async () => {
+  let setCount: ((value: number) => void) | undefined;
+  function App(): VNode {
+    const [count, set] = useState(0);
+    setCount = set;
+    return h("p", null, String(count));
+  }
+  const { app } = mountApp(App);
+  for (let i = 1; i <= HISTORY_LIMIT + 2; i += 1) {
+    setCount!(i);
+    await flush();
+  }
+  assertEqual(app.history!.entries.length, HISTORY_LIMIT);
+  assertEqual(app.history!.entries.at(-1), el("p", {}, [text(String(HISTORY_LIMIT + 2))]));
+});
+
+test("Hook 제약: 자식 컴포넌트와 렌더링 밖에서는 호출할 수 없다", () => {
+  function Child(): VNode {
+    const [value] = useState(0);
+    return h("p", null, String(value));
+  }
+  function App(): VNode {
+    return h("div", null, h(Child, {}));
+  }
+  assertThrows(() => mountApp(App), "자식 컴포넌트의 useState를 막지 않았다");
+  assertThrows(() => useState(0), "렌더링 밖의 useState를 막지 않았다");
+  assertThrows(() => useEffect(() => {}), "렌더링 밖의 useEffect를 막지 않았다");
+  assertThrows(() => useMemo(() => 1, []), "렌더링 밖의 useMemo를 막지 않았다");
+});
+
+test("Hook 제약: 렌더링마다 호출 개수나 종류가 달라지면 오류다", () => {
+  let extra = false;
+  let swap = false;
+  function Count(): VNode {
+    useState(0);
+    if (extra) useState(1);
+    return h("p");
+  }
+  function Kind(): VNode {
+    if (swap) useMemo(() => 1, []);
+    else useState(0);
+    return h("p");
+  }
+  const count = mountApp(Count).app;
+  extra = true;
+  assertThrows(() => count.update(), "늘어난 Hook 호출을 막지 않았다");
+  const kind = mountApp(Kind).app;
+  swap = true;
+  assertThrows(() => kind.update(), "종류가 바뀐 Hook 호출을 막지 않았다");
+});
+
+await testAsync("사용자 정의 Hook: 내장 Hook을 호출해 만들 수 있다", async () => {
+  function useCounter(initial: number): [number, () => void] {
+    const [count, setCount] = useState(initial);
+    const doubled = useMemo(() => count * 2, [count]);
+    return [doubled, () => setCount((previous) => previous + 1)];
+  }
+  function App(): VNode {
+    const [doubled, increase] = useCounter(1);
+    return h("button", { onClick: increase }, String(doubled));
+  }
+  const { app, container } = mountApp(App);
+  container.querySelector("button")!.click();
+  await flush();
+  assertEqual(container.textContent, "4");
+  assertEqual(app.hooks.map((hook) => hook.kind), ["state", "memo"]);
+});
+
+await testAsync("useEffect: 의존성 배열에 따라 실행 시점이 다르다", async () => {
+  const runs = { always: 0, once: 0, onCount: 0 };
+  let setters: [(value: number) => void, (value: number) => void] | undefined;
+  function App(): VNode {
+    const [count, setCount] = useState(0);
+    const [other, setOther] = useState(0);
+    setters = [setCount, setOther];
+    useEffect(() => void (runs.always += 1));
+    useEffect(() => void (runs.once += 1), []);
+    useEffect(() => void (runs.onCount += 1), [count]);
+    return h("p", null, `${count} ${other}`);
+  }
+  mountApp(App);
+  assertEqual(runs, { always: 1, once: 1, onCount: 1 }, "mount 직후");
+  setters![1](1);
+  await flush();
+  assertEqual(runs, { always: 2, once: 1, onCount: 1 }, "의존하지 않는 상태 변경 후");
+  setters![0](1);
+  await flush();
+  assertEqual(runs, { always: 3, once: 1, onCount: 2 }, "의존하는 상태 변경 후");
+});
+
+await testAsync("useEffect: DOM 반영 뒤에 실행하고, 이전 cleanup → 새 Effect 순서이며 제거할 때 마지막 cleanup을 실행한다", async () => {
+  const log: string[] = [];
+  let setCount: ((value: number) => void) | undefined;
+  let container: HTMLElement | undefined;
+  function App(): VNode {
+    const [count, set] = useState(0);
+    setCount = set;
+    useEffect(() => {
+      log.push(`Effect: ${count} (화면 ${container?.textContent ?? "0"})`);
+      return () => log.push(`Cleanup: ${count}`);
+    }, [count]);
+    return h("p", null, String(count));
+  }
+  const mounted = mountApp(App);
+  container = mounted.container;
+  setCount!(1);
+  await flush();
+  setCount!(2);
+  await flush();
+  mounted.app.unmount();
+  assertEqual(log, [
+    "Effect: 0 (화면 0)", "Cleanup: 0", "Effect: 1 (화면 1)", "Cleanup: 1", "Effect: 2 (화면 2)", "Cleanup: 2",
+  ]);
+  assertEqual(container.childNodes.length, 0, "제거 뒤에도 DOM이 남았다");
+  setCount!(3);
+  await flush();
+  assertEqual(container.childNodes.length, 0, "제거한 컴포넌트가 다시 그려졌다");
+});
+
+await testAsync("useMemo: 의존 값이 같으면 계산을 건너뛰고, 달라지면 다시 계산한다", async () => {
+  let calculations = 0;
+  let setters: [(value: number) => void, (value: number) => void] | undefined;
+  function App(): VNode {
+    const [count, setCount] = useState(2);
+    const [other, setOther] = useState(0);
+    setters = [setCount, setOther];
+    const squared = useMemo(() => {
+      calculations += 1;
+      return count * count;
+    }, [count]);
+    return h("p", null, `${squared} ${other}`);
+  }
+  const { container } = mountApp(App);
+  assertEqual([container.textContent, calculations], ["4 0", 1]);
+  setters![1](1);
+  await flush();
+  assertEqual([container.textContent, calculations], ["4 1", 1]);
+  setters![0](3);
+  await flush();
+  assertEqual([container.textContent, calculations], ["9 1", 2]);
 });
 
 const summary = `전체 ${count}개 · 통과 ${count - failures.length}개 · 실패 ${failures.length}개`;

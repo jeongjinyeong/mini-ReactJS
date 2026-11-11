@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mini-react · Phase 2</title>
+    <link rel="stylesheet" href="/src/demo/style.css" />
+  </head>
+  <body class="phase2">
+    <header class="top">
+      <h1>mini-react <small>Phase 2 · 컴포넌트와 Hook</small></h1>
+      <div class="toolbar">
+        <output id="status"></output>
+        <button id="toggle" type="button">컴포넌트 제거</button>
+        <a href="/">Phase 1 데모</a>
+        <a href="/flights.html">항공편</a>
+      </div>
+    </header>
+
+    <ol class="flow" aria-label="변경 과정">
+      <li>클릭</li>
+      <li>루트 상태</li>
+      <li>자식 props</li>
+      <li>이전·새 VDOM</li>
+      <li>Diff</li>
+      <li>Patch</li>
+    </ol>
+
+    <main>
+      <section class="panel area-app">
+        <h2>실제 화면</h2>
+        <div id="app"></div>
+        <p class="hint">버튼을 누르면 바뀐 부분이 2초 동안 빨갛게 표시된다.</p>
+      </section>
+
+      <section class="panel area-components">
+        <h2>컴포넌트와 props</h2>
+        <div id="components"></div>
+      </section>
+
+      <section class="panel area-hooks">
+        <h2>루트의 Hook 저장소</h2>
+        <div id="hooks"></div>
+      </section>
+
+      <section class="panel area-trace">
+        <h2>Hook 실행 기록</h2>
+        <div id="trace"></div>
+      </section>
+
+      <section class="panel area-diff">
+        <h2>Diff 결과</h2>
+        <div id="patches"></div>
+      </section>
+
+      <section class="panel area-code">
+        <div class="steps">
+          <div>
+            <h2>이전 VDOM</h2>
+            <pre id="previous"></pre>
+          </div>
+          <div>
+            <h2>화면에 반영된 VDOM</h2>
+            <pre id="next"></pre>
+          </div>
+          <div>
+            <h2>실제 DOM</h2>
+            <pre id="dom"></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/demo/cart.ts"></script>
+  </body>
+</html>

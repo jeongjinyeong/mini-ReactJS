@@ -67,3 +67,377 @@ main {
   overflow: auto;
   font-size: 0.75rem;
 }
+
+/* ───────── Phase 2 (body.phase2 아래에만 적용) ───────── */
+.phase2 {
+  --bg: #f4f5f7;
+  --card: #fff;
+  --line: #dfe2e8;
+  --text: #1c2030;
+  --muted: #667085;
+  --accent: #3b5bdb;
+  --accent-soft: #e7ecff;
+  --code-bg: #f7f8fa;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+html:has(.phase2) {
+  background: #f4f5f7;
+}
+
+.phase2 .top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.phase2 h1 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.phase2 h1 small {
+  margin-left: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.phase2 .toolbar {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.phase2 .toolbar a {
+  color: var(--accent);
+}
+
+.phase2 #status {
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.phase2 button {
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--card);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.phase2 button:hover {
+  border-color: var(--accent);
+}
+
+.phase2 button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 변경 과정 */
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  counter-reset: flow;
+  font-size: 0.8rem;
+}
+
+.flow li {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  counter-increment: flow;
+}
+
+.flow li::before {
+  display: inline-grid;
+  width: 1.5em;
+  height: 1.5em;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+  content: counter(flow);
+}
+
+.flow li:not(:last-child)::after {
+  margin: 0 -4px 0 4px;
+  color: var(--muted);
+  content: "→";
+}
+
+/* 패널 배치 */
+.phase2 main {
+  grid-template-columns: 1fr;
+  grid-template-areas: "app" "components" "hooks" "trace" "diff" "code";
+}
+
+@media (min-width: 640px) {
+  .phase2 main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "app components"
+      "hooks hooks"
+      "trace diff"
+      "code code";
+  }
+}
+
+@media (min-width: 1000px) {
+  .phase2 main {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "app components components"
+      "hooks trace diff"
+      "code code code";
+  }
+}
+
+.area-app { grid-area: app; }
+.area-components { grid-area: components; }
+.area-hooks { grid-area: hooks; }
+.area-trace { grid-area: trace; }
+.area-diff { grid-area: diff; }
+.area-code { grid-area: code; }
+
+.phase2 .panel {
+  padding: 14px 16px;
+  border-color: var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.phase2 .panel h2 {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.phase2 .hint,
+.phase2 .empty {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.phase2 .empty {
+  margin: 0;
+}
+
+.phase2 code,
+.phase2 pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+/* 장바구니 */
+.cart .tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.cart .tab {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+
+.cart .tab.active {
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--card);
+  font-weight: 600;
+}
+
+.cart ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cart li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.cart .name {
+  flex: 1;
+}
+
+.cart .count {
+  padding: 0 6px;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cart li button {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cart .summary {
+  margin: 12px 0 0;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.cart p.empty {
+  padding: 16px 0;
+  text-align: center;
+}
+
+/* 검사 화면 */
+.badge,
+.chip,
+.slot {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.badge {
+  color: #fff;
+  background: #667085;
+  font-weight: 600;
+}
+
+.badge.state,
+.badge.update_props { background: #3b5bdb; }
+.badge.memo,
+.badge.move { background: #7048e8; }
+.badge.effect,
+.badge.insert { background: #2b8a3e; }
+.badge.update_text { background: #b35c00; }
+.badge.remove,
+.badge.replace { background: #c92a2a; }
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.chip b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.slot {
+  padding: 0;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tree,
+.tree ul,
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tree ul {
+  margin-left: 8px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+}
+
+.tree .node,
+.rows li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.tree strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.rows li + li {
+  border-top: 1px solid var(--line);
+}
+
+.rows code {
+  flex-basis: 100%;
+  word-break: break-all;
+  color: var(--text);
+}
+
+.log {
+  margin: 0;
+  padding-left: 22px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.log li {
+  padding: 2px 0;
+}
+
+.log li::marker {
+  color: var(--muted);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.steps > div {
+  min-width: 0;
+}
+
+.steps pre {
+  height: 320px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--code-bg);
+  white-space: pre-wrap;
+  word-break: break-all;
+}

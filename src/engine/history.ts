@@ -1,8 +1,8 @@
-import type { VNode } from "../engine/vnode";
+import type { VNode } from "./vnode";
 
 export const HISTORY_LIMIT = 10;
 
-/* entries[cursor]가 실제 영역에 마지막으로 반영된 VDOM이다. */
+/* entries[cursor]가 화면에 마지막으로 반영된 VDOM이다. */
 export interface History {
   entries: VNode[];
   cursor: number;

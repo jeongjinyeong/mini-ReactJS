@@ -10,6 +10,7 @@ export type Patch =
   | { type: "REPLACE"; path: Path; node: VNode }
   | { type: "UPDATE_TEXT"; path: Path; value: string }
   | { type: "UPDATE_PROPS"; path: Path; set: Props; remove: string[] }
+  | { type: "UPDATE_HANDLERS"; path: Path; set: Props; remove: string[] } // 화면은 그대로, 핸들러만 교체
   | { type: "MOVE"; path: Path; index: number }; // 같은 부모 안에서 index 위치로 이동
 
 /* 이전 트리와 새 트리를 깊이 우선으로 비교해 적용 순서대로 변경 목록을 만든다.
@@ -33,13 +34,22 @@ function diffNode(oldNode: VNode, newNode: VNode, path: Path, patches: Patch[]):
     return;
   }
 
-  const set: Props = {};
+  /* 이벤트 핸들러는 렌더링마다 새 함수가 되므로 화면 변경(UPDATE_PROPS)과 따로 모은다. */
+  const props = { set: {} as Props, remove: [] as string[] };
+  const handlers = { set: {} as Props, remove: [] as string[] };
   for (const name of Object.keys(newNode.props)) {
-    if (oldNode.props[name] !== newNode.props[name]) set[name] = newNode.props[name];
+    const value = newNode.props[name];
+    if (oldNode.props[name] !== value) (typeof value === "function" ? handlers : props).set[name] = value;
   }
-  const remove = Object.keys(oldNode.props).filter((name) => !(name in newNode.props));
-  if (Object.keys(set).length > 0 || remove.length > 0) {
-    patches.push({ type: "UPDATE_PROPS", path, set, remove });
+  for (const name of Object.keys(oldNode.props)) {
+    if (name in newNode.props) continue;
+    (typeof oldNode.props[name] === "function" ? handlers : props).remove.push(name);
+  }
+  if (Object.keys(props.set).length > 0 || props.remove.length > 0) {
+    patches.push({ type: "UPDATE_PROPS", path, ...props });
+  }
+  if (Object.keys(handlers.set).length > 0 || handlers.remove.length > 0) {
+    patches.push({ type: "UPDATE_HANDLERS", path, ...handlers });
   }
 
   diffChildren(oldNode.children, newNode.children, path, patches);

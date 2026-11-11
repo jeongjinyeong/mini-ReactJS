@@ -4,9 +4,10 @@ export enum VNodeType {
   TEXT = 3,
 }
 
-/* Phase 1은 HTML 속성(string)과 checked 같은 DOM 프로퍼티(boolean)를 담는다.
-   이벤트 핸들러(function)는 Phase 2에서 추가한다. */
-export type PropValue = string | boolean;
+/* string은 HTML 속성, boolean은 checked 같은 DOM 프로퍼티, 함수는 이벤트 핸들러다.
+   핸들러의 이름은 onClick처럼 on으로 시작하고, DOM에는 소문자 프로퍼티(onclick)로 붙인다. */
+export type EventHandler = (event: Event) => void;
+export type PropValue = string | boolean | EventHandler;
 export type Props = { [name: string]: PropValue };
 
 export interface VNode {

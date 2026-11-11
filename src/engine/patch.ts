@@ -1,7 +1,7 @@
-import { managedChildren, removeProp, setProp, toDOM } from "./dom";
+import { managedChildren, removeHandler, removeProp, setProp, toDOM } from "./dom";
 import type { Patch, Path } from "./diff";
 
-/* 변경 목록을 실제 DOM에 적용하고, 바뀐 DOM 노드들을 반환한다.
+/* 변경 목록을 실제 DOM에 적용하고, 화면이 바뀐 DOM 노드들을 반환한다.
    경로는 이전 트리 기준이므로 첫 DOM 쓰기 전에 모두 노드로 해석해 둔다.
    그래야 삭제·이동으로 인덱스가 바뀌어도 엉뚱한 노드를 건드리지 않는다. */
 export function patch(root: Node, patches: Patch[]): Node[] {
@@ -46,6 +46,12 @@ export function patch(root: Node, patches: Patch[]): Node[] {
         for (const name of Object.keys(change.set)) setProp(element, name, change.set[name]);
         changed.push(element);
         break;
+      }
+      case "UPDATE_HANDLERS": {
+        const element = target as Element;
+        for (const name of change.remove) removeHandler(element, name);
+        for (const name of Object.keys(change.set)) setProp(element, name, change.set[name]);
+        break; // 화면은 바뀌지 않으므로 changed에 넣지 않는다.
       }
     }
   });

@@ -2,7 +2,7 @@
 
 ## 현재 상태
 
-2026-11-09 기준 Phase 1의 엔진과 데모가 구현되어 있다. `src/engine/`에 VDOM 타입(`vnode.ts`), `fromDOM`·`toDOM`(`dom.ts`), `diff`(`diff.ts`), `patch`(`patch.ts`)가 있고, `src/demo/`에 편집기·미리보기·이력 탐색 데모(`main.ts`), 이력(`history.ts`), 입력 검증(`validate.ts`)이 있다. 브라우저 진입점은 루트 `index.html`이다. 자동 테스트는 개발 서버의 `/tests/index.html`에서 실행하는 브라우저 테스트(`tests/engine.test.ts`)이며 `npm test`는 아직 설정하지 않았다. 실행 명령은 README, 테스트 실행 방법은 `tests/README.md`를 참고한다. 검증 결과는 실행한 환경과 실제 출력을 확인해 기록한다.
+2026-11-10 기준 Phase 1과 Phase 2의 엔진과 데모가 구현되어 있다. `src/engine/`에 VDOM 타입(`vnode.ts`), `fromDOM`·`toDOM`(`dom.ts`), `diff`(`diff.ts`), `patch`(`patch.ts`), 이력(`history.ts`), 컴포넌트와 Hook(`component.ts`: `h`, `FunctionComponent`, `useState`, `useEffect`, `useMemo`)이 있다. `src/demo/`에 Phase 1 편집기·미리보기·이력 탐색 데모(`main.ts`)와 입력 검증(`validate.ts`), Phase 2 과일 장바구니 데모(`cart.ts`)가 있다. 브라우저 진입점은 루트 `index.html`(Phase 1)과 `phase2.html`(Phase 2)이다. 자동 테스트는 개발 서버의 `/tests/index.html`에서 실행하는 브라우저 테스트(`tests/engine.test.ts`)이며 `npm test`는 아직 설정하지 않았다. 실행 명령은 README, 테스트 실행 방법은 `tests/README.md`를 참고한다. 검증 결과는 실행한 환경과 실제 출력을 확인해 기록한다.
 
 ## 읽는 순서
 
@@ -22,8 +22,8 @@
 ## 작업할 때
 
 - 현재 요청과 실제 파일을 먼저 확인한다. 문서에 적힌 계획과 실제 구현 상태를 구분하고, 확인한 테스트 결과만 보고한다.
-- HTML, CSS, TypeScript를 쓴다. 엔진은 `src/engine/`, 브라우저 데모는 `src/demo/`, 테스트는 `tests/`에 둔다. 브라우저 진입점은 루트 `index.html`을 사용한다.
-- Phase 1에서 만든 Diff와 Patch는 Phase 2에서도 재사용한다. 이번 주에는 Phase 1을 끝내고 컴포넌트와 Hooks는 Phase 2에서 다룬다.
+- HTML, CSS, TypeScript를 쓴다. 엔진은 `src/engine/`, 브라우저 데모는 `src/demo/`, 테스트는 `tests/`에 둔다. 브라우저 진입점은 루트의 `index.html`과 `phase2.html`을 사용한다.
+- Phase 2는 Phase 1의 Diff와 Patch, 이력을 그대로 재사용한다. Hook과 상태는 루트 컴포넌트만 가지고, 자식은 `h(자식, props)`로 호출하며 props만 쓴다. JSX는 쓰지 않는다.
 - 기존 문서가 정한 계약을 바꿔야 하면 요구사항, 설계, 테스트에서 영향을 받는 항목을 함께 맞춘다.
 - 결과물을 우선 완성하고, 사용자가 구현을 설명할 수 있게 답변은 한국어로 결론부터 적는다. 첫 설명은 “이전 트리와 다음 트리를 비교해 어떤 DOM 노드를 왜 유지했는가”에서 시작한다.
 - YAGNI 원칙을 적용하고, Ponytail Skill을 적용한다. 최대한 표준 라이브러리 내에서 구현하거나, 구현 방법을 설명한다.

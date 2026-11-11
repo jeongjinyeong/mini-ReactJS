@@ -28,7 +28,7 @@ Virtual DOM부터 Diff, Patch, Component, Hooks까지 직접 만드는 TypeScrip
 | --- | --- |
 | **화면을 데이터로** | 요소·속성·텍스트·자식 순서를 Virtual DOM으로 표현한다. |
 | **변경은 필요한 곳에만** | Diff가 변경 목록을 만들고 Patch가 해당 DOM 노드에 적용한다. |
-| **하나의 상태, 일관된 UI** | 후속 단계에서 상태로 다음 트리를 계산하고 컴포넌트·Hooks를 연결한다. |
+| **하나의 상태, 일관된 UI** | 루트 컴포넌트의 상태로 다음 트리를 계산하고 자식에는 props로 내려 준다. |
 
 ```text
 Phase 1   실제 DOM → Virtual DOM → Diff → Patch → 실제 DOM
@@ -37,7 +37,7 @@ Phase 2   상태 변경 → Component + Hooks → 다음 Virtual DOM → 같은 
 
 ### 현재 구현 상태
 
-현재 **Phase 1의 엔진과 데모가 구현**되어 있다. Phase 2(Component, State, Hooks)는 아직 시작하지 않았다.
+현재 **Phase 1과 Phase 2의 엔진과 데모가 구현**되어 있다.
 
 | 범위 | 상태 |
 | --- | --- |
@@ -46,7 +46,11 @@ Phase 2   상태 변경 → Component + Hooks → 다음 Virtual DOM → 같은 
 | Diff (`diff`) | `INSERT`·`REMOVE`·`REPLACE`·`UPDATE_TEXT`·`UPDATE_PROPS`·`MOVE`, `key` 기반 대응, `key` 중복 오류 |
 | Patch (`patch`) | 경로를 먼저 DOM 노드로 해석한 뒤 변경 대상만 수정 |
 | HTML 편집기 / 미리보기 / 이력 탐색 | 구현. 이력은 최대 10개, 바뀐 영역은 2초간 빨갛게 표시 |
-| Component / State / Hooks | Phase 2 계획 |
+| Component (`h`, `FunctionComponent`) | 함수형 컴포넌트와 props, `mount()`·`update()`·`unmount()`. JSX 없이 `h`를 직접 호출 |
+| Hooks | `useState`·`useEffect`·`useMemo`, 사용자 정의 Hook. 루트 컴포넌트에서만 호출 가능 |
+| 이벤트 | `onClick` 같은 함수 props. 한 핸들러 안의 상태 변경은 한 번의 갱신으로 반영 |
+| Phase 2 데모 | 과일 장바구니와 컴포넌트·Hook·VDOM 검사 화면(`/phase2.html`) |
+| 항공편 데모 | 시간 위에서 휠을 돌리면 출발 항공편이 바뀌는 플랩 안내판(`/flights.html`, 더미 데이터) |
 | 자동 테스트 | 브라우저 테스트 페이지(`/tests/index.html`). `npm test`는 미설정 |
 
 ## Getting started
@@ -59,7 +63,7 @@ npm ci
 npm run dev
 ```
 
-개발 서버가 출력한 주소의 `/`에서 데모를, `/tests/index.html`에서 테스트 결과를 연다. 데모 소스는 `src/demo/`에 둔다.
+개발 서버가 출력한 주소의 `/`에서 Phase 1 데모를, `/phase2.html`에서 Phase 2 데모를, `/flights.html`에서 항공편 데모를, `/tests/index.html`에서 테스트 결과를 연다. 데모 소스는 `src/demo/`에 둔다.
 
 ### Commands
 
@@ -67,7 +71,7 @@ npm run dev
 | --- | --- |
 | `npm run dev` | 개발 서버 실행 |
 | `npm run check` | TypeScript 타입 검사 |
-| `npm run build` | 타입 검사 후 루트 페이지 빌드 |
+| `npm run build` | 타입 검사 후 두 데모 페이지 빌드 |
 | `npm test` | 아직 미설정이며 실패 코드로 종료. 테스트는 브라우저에서 실행한다. [테스트 안내](tests/README.md) 참고 |
 
 ## Example
@@ -143,15 +147,31 @@ patch(actual, changes); // 기존 button 노드는 그대로 두고 텍스트만
 
 ### Phase 2 · Component, State, Hooks
 
-- [ ] 함수형 컴포넌트 조합과 props 전달
-- [ ] `FunctionComponent` 인스턴스의 `mount()`·`update()`와 Hook 슬롯 관리
-- [ ] `useState`를 통한 상태 변경과 자동 DOM 갱신
-- [ ] DOM 반영 이후의 `useEffect` 및 정리 함수
-- [ ] 의존성 기반 계산 재사용을 위한 `useMemo`
-- [ ] 하나의 루트 상태를 공유하는 여러 자식의 UI 일관성 검증
-- [ ] 선택 과제: 연속 상태 변경을 묶는 Batching
+- [x] 함수형 컴포넌트 조합과 props 전달
+- [x] `FunctionComponent` 인스턴스의 `mount()`·`update()`와 Hook 슬롯 관리
+- [x] `useState`를 통한 상태 변경과 자동 DOM 갱신
+- [x] DOM 반영 이후의 `useEffect` 및 정리 함수
+- [x] 의존성 기반 계산 재사용을 위한 `useMemo`
+- [x] 하나의 루트 상태를 공유하는 여러 자식의 UI 일관성 검증
+- [x] 연속 상태 변경을 한 번의 갱신으로 묶기
+- [ ] 브라우저 인수 테스트 P2-E1–P2-E6 전체 기록
 
-Hook과 상태는 루트가 소유한다. 자식은 props로 받은 값과 콜백을 사용하며, Phase 1의 Diff와 Patch를 그대로 재사용한다. 마지막 Patch의 변경 종류·개수 표시도 기능 검증 이후의 선택 과제다.
+Hook과 상태는 루트가 소유한다. 자식은 props로 받은 값과 콜백을 사용하며, Phase 1의 Diff와 Patch를 그대로 재사용한다.
+
+```ts
+import { FunctionComponent, h, useState } from "./src/engine/component";
+
+function Counter({ count, onAdd }: { count: number; onAdd: () => void }) {
+  return h("button", { type: "button", onClick: onAdd }, `좋아요 ${count}`);
+}
+
+function App() {
+  const [count, setCount] = useState(10);
+  return h("div", null, h(Counter, { count, onAdd: () => setCount((previous) => previous + 1) }));
+}
+
+new FunctionComponent(App, document.body).mount(); // 클릭하면 button의 텍스트만 바뀐다.
+```
 
 ## Why mini-react?
 
@@ -200,15 +220,17 @@ Backbone.js, Knockout.js, AngularJS 같은 도구의 MVC/MVVM, 이벤트, 템플
 
 ```text
 mini-react/
-├─ index.html       # 브라우저 진입점과 샘플 DOM
+├─ index.html       # Phase 1 데모 진입점과 샘플 DOM
+├─ phase2.html      # Phase 2 데모 진입점
+├─ flights.html     # 항공편 데모 진입점
 ├─ src/
-│  ├─ engine/       # Virtual DOM 타입, DOM 변환, Diff, Patch
-│  └─ demo/         # 데모 진입 모듈과 향후 편집기·이력 UI
-├─ tests/           # 현재 테스트 추가 안내, 향후 자동 테스트
+│  ├─ engine/       # Virtual DOM 타입, DOM 변환, Diff, Patch, 이력, 컴포넌트와 Hook
+│  └─ demo/         # Phase 1 편집기·이력 UI, Phase 2 장바구니와 검사 화면
+├─ tests/           # 브라우저 테스트 페이지와 테스트 코드
 └─ docs/            # 요구사항, 아키텍처, 테스트 계획
 ```
 
-의존 방향은 `demo → engine`이다. Phase 2에서는 `src/runtime/`을 추가해 컴포넌트와 Hooks를 연결한다.
+의존 방향은 `demo → engine`이다. 컴포넌트와 Hook은 `src/engine/component.ts`에 있다.
 
 ## Documentation
 
