@@ -415,5 +415,117 @@ await scenario('FR-008 이력 10개 상한과 삭제 후 처음·마지막 이�
   assert(app.back.disabled, '첫 위치 경계');
 });
 
+await test('Unit: fromDOM은 주석을 제외하고 나뉜 텍스트 노드를 보존한다', () => {
+  const vnode = fromDOM(element('<p>앞<!-- 중간 -->뒤</p>'));
+  equal(vnode, {
+    type: VNodeType.ELEMENT,
+    tagName: 'p',
+    props: {},
+    children: [{ type: VNodeType.TEXT, value: '앞' }, { type: VNodeType.TEXT, value: '뒤' }],
+  }, '주석 제외 후 텍스트 노드 경계 보존');
+});
+
+await test('Unit: toDOM은 data-key와 checkbox checked 상태를 렌더링한다', () => {
+  const vnode = {
+    type: VNodeType.ELEMENT,
+    tagName: 'input',
+    key: 'agree',
+    props: { type: 'checkbox', checked: '' },
+    children: [],
+  };
+  const dom = toDOM(vnode);
+  assert(dom.tagName === 'INPUT' && dom.getAttribute('data-key') === 'agree', 'data-key 속성');
+  assert(dom.checked, 'checkbox checked 상태');
+  const unchecked = toDOM({ type: VNodeType.ELEMENT, tagName: 'input', props: { type: 'checkbox' }, children: [] });
+  assert(!unchecked.checked, 'checked 미지정 시 해제');
+});
+
+await test('Unit: diff는 새 자식 목록이 비면 기존 자식을 모두 REMOVE한다', () => {
+  const previous = fromDOM(element('<ul><li data-key="a">A</li><li>B</li></ul>'));
+  const next = fromDOM(element('<ul></ul>'));
+  const changes = diff(previous, next);
+  equal(changes.map(change => change.type), ['REMOVE', 'REMOVE'], '모든 자식 제거');
+});
+
+await test('Unit: diff는 속성 추가·변경·삭제를 정확히 분류한다', () => {
+  const previous = fromDOM(element('<p id="x" class="old" title="keep">text</p>'));
+  const next = fromDOM(element('<p id="y" title="keep" data-a="new">text</p>'));
+  const changes = diff(previous, next);
+  equal(changes.length, 1, '속성 변경 하나');
+  const props = changes[0];
+  equal(props.type, 'UPDATE_PROPS');
+  equal(props.set, { id: 'y', 'data-a': 'new' }, '추가·변경');
+  equal(props.remove, ['class'], '삭제');
+});
+
+await test('Unit: patch는 존재하지 않는 경로에서 오류를 던진다', () => {
+  const host = document.createElement('div');
+  host.appendChild(element('<p></p>'));
+  throws(() => patch(host, [{ type: 'UPDATE_TEXT', path: [0, 5], value: 'x' }]), '없는 자식 경로');
+  throws(() => patch(host, [{ type: 'REMOVE', path: [2] }]), '없는 루트 경로');
+});
+
+await test('Integration: keyed 이동과 텍스트 갱신을 diff·patch로 한 번에 반영', () => {
+  const { host, previousDOM, next, changes } = fixture(
+    '<ul><li data-key="a">A</li><li data-key="b">B</li></ul>',
+    '<ul><li data-key="b">B2</li><li data-key="a">A</li></ul>',
+  );
+  const b = previousDOM.children[1];
+  equal(changes.map(change => change.type), ['MOVE', 'UPDATE_TEXT'], '이동과 텍스트 갱신');
+  patch(host, changes);
+  equal(fromDOM(previousDOM), next, '최종 VNode 일치');
+  assert(previousDOM.children[0] === b, 'b 노드 재사용');
+});
+
+await test('Integration: 속성 추가·삭제·교체를 diff·patch로 반영하고 DOM 객체를 재사용한다', () => {
+  const { host, previousDOM, next, changes } = fixture(
+    '<section><p class="old" id="x">text</p></section>',
+    '<section><p id="y" data-a="1">text</p></section>',
+  );
+  const paragraph = previousDOM.firstElementChild;
+  equal(changes.map(change => change.type), ['UPDATE_PROPS'], '속성 변경 작업');
+  patch(host, changes);
+  equal(fromDOM(previousDOM), next, '패치 결과');
+  assert(previousDOM.firstElementChild === paragraph, '요소 객체 재사용');
+  assert(paragraph.getAttribute('class') === null, '삭제된 속성');
+  assert(paragraph.getAttribute('id') === 'y' && paragraph.getAttribute('data-a') === '1', '변경·추가된 속성');
+});
+
+await scenario('FR-002 checkbox input의 checked 상태가 Patch 후에도 반영된다', app => {
+  app.applyHTML('<label><input type="checkbox" checked> 동의</label>');
+  const input = app.actual.querySelector('input');
+  assert(input.checked, '초기 checked 상태');
+  app.applyHTML('<label><input type="checkbox"> 동의</label>');
+  const after = app.actual.querySelector('input');
+  assert(!after.checked, 'checked 제거 반영');
+});
+
+await scenario('FR-002 빈 입력과 여러 최상위 노드도 파싱되어 Patch된다', app => {
+  app.applyHTML('');
+  equal(app.actual.firstElementChild.innerHTML, '', '빈 입력은 루트 div를 비움');
+  equal(app.cursor(), '2 / 2', '빈 입력도 이력에 저장');
+  app.applyHTML('<p>A</p><span>B</span>');
+  equal(app.actual.firstElementChild.children.length, 2, '두 최상위 노드');
+  equal(app.actual.firstElementChild.children[0].tagName, 'P');
+  equal(app.actual.firstElementChild.children[1].tagName, 'SPAN');
+});
+
+await scenario('FR-002 aria-invalid와 오류 표시가 유효성 상태를 반영한다', app => {
+  app.edit('<p>valid</p>');
+  assert(!app.editor.hasAttribute('aria-invalid'), '유효 입력 시 aria-invalid 제거');
+  assert(app.error.hidden, '유효 입력 시 오류 숨김');
+  app.apply.click();
+  equal(app.actual.textContent, 'valid', '유효 입력 적용');
+  const validPreview = app.previewHTML();
+  app.edit('<svg></svg>');
+  assert(app.editor.getAttribute('aria-invalid') === 'true', '오류 시 aria-invalid');
+  assert(!app.error.hidden, '무효 입력 시 오류 표시');
+  equal(app.previewHTML(), validPreview, '무효 입력은 마지막 유효 미리보기 유지');
+  app.edit('<p>valid again</p>');
+  assert(!app.editor.hasAttribute('aria-invalid'), '다시 유효해지면 aria-invalid 제거');
+  assert(app.error.hidden, '복구 후 오류 숨김');
+  equal(app.preview.textContent, 'valid again', '복구 후 미리보기 갱신');
+});
+
 const encoded = new TextEncoder().encode(JSON.stringify(results));
 document.body.dataset.testReport = btoa(String.fromCharCode(...encoded));

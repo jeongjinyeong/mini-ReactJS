@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker/master/packages/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "node tests/run-mutation-tests.mjs"
+  },
+  "mutate": [
+    "src/phase1/diff.js:12-19",
+    "src/phase1/patch.js:65-68"
+  ],
+  "reporters": [
+    "clear-text",
+    "progress",
+    "json"
+  ],
+  "jsonReporter": {
+    "fileName": "tests/mutation-constrained-report.json"
+  },
+  "timeoutMS": 15000,
+  "concurrency": 1,
+  "ignorePatterns": [
+    "demo/**",
+    "docs/**",
+    "tests/phase1-browser-tests.js",
+    "tests/run-phase1-tests.mjs"
+  ],
+  "tempDirName": ".stryker-tmp"
+}
