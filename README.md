@@ -1,6 +1,5 @@
+# mini-react 
 ![mini-react](src/img/image.png)
-
-# mini-react Phase 1
 
 HTML을 VNode로 변환하고, 이전·다음 트리의 차이를 실제 DOM에 적용하는 학습용 프로젝트입니다.
 React 컴포넌트나 Hooks를 실행하는 라이브러리가 아니라 **DOM 변환 → Diff → Patch**의 동작을
