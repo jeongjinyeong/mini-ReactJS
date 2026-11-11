@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+
+# Logs and test artifacts
+*.log
+coverage/
+.stryker-tmp/
+
+# Local agent files
+.omo/
+
+# Operating system files
+.DS_Store
+Thumbs.db
