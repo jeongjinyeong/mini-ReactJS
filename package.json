@@ -1,0 +1,11 @@
+{
+  "name": "mini-react-js",
+  "private": true,
+  "scripts": {
+    "build": "tsc && node demo/build-demo.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

@@ -57,7 +57,10 @@
     .tree, .tree ol, .hook-list, .log { list-style: none; padding: 0; }
     .tree ol { padding-left: 10px; margin-left: 5px; border-left: 1px solid #c9c2e5; }
     .record { padding: 4px 0; overflow-wrap: anywhere; }
-    .record > code { color: var(--accent); font-size: .77rem; font-weight: 700; }
+    .record > code, .component-select { color: var(--accent); font-size: .77rem; font-weight: 700; }
+    .component-select { min-height: 30px; margin-bottom: 3px; padding: 3px 7px; }
+    .component-select[aria-pressed="true"] { color: white; }
+    .props-card { margin-top: 8px; padding: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); }
     .props, .slot-data { color: var(--muted); font: .73rem/1.45 var(--mono); overflow-wrap: anywhere; }
     .hook-list li + li, .log li + li { border-top: 1px solid #e9e4f4; }
     .commit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 13px; margin-top: 13px; }
@@ -112,6 +115,10 @@
           <div class="surface">
             <h3>컴포넌트 트리 · props</h3>
             <div id="components"></div>
+            <div class="props-card">
+              <h3>선택한 props</h3>
+              <p class="props" id="selected-props" aria-live="polite">과일 행을 선택하세요.</p>
+            </div>
           </div>
           <div class="surface">
             <h3>루트의 Hook 저장소</h3>
@@ -129,7 +136,7 @@
       </section>
       <section class="panel" aria-labelledby="log-title">
         <h2 id="log-title">Hook 실행 기록</h2>
-        <p class="caption">최근 렌더링에서 계산, 재사용, Effect 실행과 정리를 기록합니다.</p>
+        <p class="caption">최근 렌더링에서 이벤트, 상태 변경, 계산, Effect 실행과 정리를 기록합니다.</p>
         <ol class="log" id="hook-log"></ol>
       </section>
     </div>

@@ -5,12 +5,16 @@ const app = document.getElementById('app');
 const eventStatus = document.getElementById('event-status');
 const effectStatus = document.getElementById('effect-status');
 const lifecycle = document.getElementById('lifecycle');
+const components = document.getElementById('components');
+const selectedProps = document.getElementById('selected-props');
 const filters = { all: '전체', cart: '담은 과일만' };
+let selectedFruitId;
+let pendingAdd;
 
 const useCart = defineHook(function useCart() {
   const [fruit, setFruit] = useState([
     { id: 'grape', name: '포도', count: 0 },
-    { id: 'apple', name: '사과', count: 1 },
+    { id: 'apple', name: '사과', count: 0 },
     { id: 'banana', name: '바나나', count: 0 },
   ]);
   return [fruit, id => setFruit(previous => previous.map(item =>
@@ -66,8 +70,13 @@ function App() {
         name,
         count,
         onAdd: () => {
-          eventStatus.textContent = name + ' 1개 추가 · App에서 새 수량을 계산했습니다.';
-          add(id);
+          pendingAdd = { id, name, count };
+          try {
+            add(id);
+            eventStatus.textContent = name + ' 1개 추가 · App에서 새 수량을 계산했습니다.';
+          } finally {
+            pendingAdd = undefined;
+          }
         },
       }))),
     h(CartSummary, { total }));
@@ -120,6 +129,19 @@ function componentKey(record) {
   return record.name + ':' + (record.props.id ?? '');
 }
 
+function findFruit(tree, id) {
+  return tree?.children.find(record => record.name === 'FruitRow' && record.props.id === id);
+}
+
+function selectFruit(record) {
+  selectedFruitId = record?.props.id;
+  const text = record ? describe(record.props) : '과일 행을 선택하세요.';
+  if (selectedProps.textContent !== text) selectedProps.textContent = text;
+  for (const button of components.querySelectorAll('.component-select')) {
+    button.setAttribute('aria-pressed', String(button.dataset.fruitId === selectedFruitId));
+  }
+}
+
 function componentRow(record, previous, active, removed = false) {
   const li = create('li');
   const item = create('div', undefined, 'record');
@@ -128,8 +150,19 @@ function componentRow(record, previous, active, removed = false) {
   if (active && (!previous || removed)) {
     name.replaceChildren(marker(record.name + (removed ? ' · 제거' : ' · 추가')));
   }
-  showDifference(props, describe(record.props), previous && describe(previous.props), active);
-  item.append(name, props);
+  showDifference(props, describe(record.props), previous ? describe(previous.props) : undefined, active);
+  if (record.name === 'FruitRow' && !removed) {
+    item.dataset.componentFruit = record.props.id;
+    const button = create('button', undefined, 'component-select');
+    button.type = 'button';
+    button.dataset.fruitId = record.props.id;
+    button.setAttribute('aria-label', record.props.name + ' props 보기');
+    button.setAttribute('aria-controls', selectedProps.id);
+    button.append(name, ' · ' + record.props.name);
+    item.append(button, props);
+  } else {
+    item.append(name, props);
+  }
   li.append(item);
 
   const oldChildren = new Map((previous?.children ?? []).map(child => [componentKey(child), child]));
@@ -164,25 +197,29 @@ function snapshotMarks(changes) {
     switch (change.type) {
       case 'UPDATE_TEXT':
         at(before, path).text = true;
-        at(after, path).text = true;
+        at(after, change.nextPath ?? path).text = true;
         break;
       case 'UPDATE_PROPS': {
         const keys = new Set([...change.remove, ...Object.keys(change.set)]);
         at(before, path).props = keys;
-        at(after, path).props = keys;
+        at(after, change.nextPath ?? path).props = keys;
         break;
       }
       case 'REPLACE':
         at(before, path).branch = true;
-        at(after, path).branch = true;
+        at(after, change.nextPath ?? path).branch = true;
         break;
       case 'INSERT':
         at(before, path).children = true;
-        at(after, [...path, change.index]).branch = true;
+        at(after, change.nextPath ?? [...path, change.index]).branch = true;
         break;
       case 'REMOVE':
         at(before, path).branch = true;
-        at(after, path.slice(0, -1)).children = true;
+        at(after, change.nextPath ?? path.slice(0, -1)).children = true;
+        break;
+      case 'MOVE':
+        at(before, path).branch = true;
+        at(after, change.nextPath ?? [...path.slice(0, -1), change.index]).branch = true;
         break;
     }
   }
@@ -256,13 +293,18 @@ let lastDisplay;
 
 function showRender({ phase, previous, next, changes, componentTree, log }) {
   const active = lastDisplay !== undefined;
-  const components = document.getElementById('components');
+  const focusedFruitId = document.activeElement?.dataset.fruitId;
   if (componentTree) {
     const list = create('ol', undefined, 'tree');
     list.append(componentRow(componentTree, lastDisplay?.componentTree, active));
     components.replaceChildren(list);
   } else {
     components.replaceChildren(create('p', '마운트된 컴포넌트 없음', 'empty change-mark'));
+  }
+  selectFruit(findFruit(componentTree, selectedFruitId));
+  if (focusedFruitId) {
+    [...components.querySelectorAll('.component-select')]
+      .find(button => button.dataset.fruitId === focusedFruitId)?.focus({ preventScroll: true });
   }
 
   const changedSlots = new Set();
@@ -287,14 +329,25 @@ function showRender({ phase, previous, next, changes, componentTree, log }) {
   if (phase === 'unmount') hookRows.push(create('li', 'Hook 저장소를 비웠습니다.', 'record change-mark'));
   document.getElementById('hooks').replaceChildren(...hookRows);
 
-  document.getElementById('hook-log').replaceChildren(...log.map(({ hook, index, action, deps }) => {
+  const logItems = log.map(({ hook, index, action, deps }) => {
     const text = (index === undefined ? '' : '#' + index + ' ') + hook + ' · ' + actions[action] +
       (deps?.length ? ' ' + describe(deps) : '');
     const changed = active && (changedSlots.has(index) || ['calculate', 'run', 'cleanup'].includes(action));
     const item = create('li');
     item.append(changed ? marker(text) : text);
     return item;
-  }));
+  });
+  if (phase === 'update' && pendingAdd) {
+    const { id, name, count } = pendingAdd;
+    const updated = findFruit(componentTree, id);
+    if (updated && updated.props.count !== count) {
+      logItems.unshift(
+        create('li', 'onAdd · ' + name + ' 1개 추가 요청'),
+        create('li', 'App useState · ' + name + ' ' + count + ' → ' + updated.props.count),
+      );
+    }
+  }
+  document.getElementById('hook-log').replaceChildren(...logItems);
 
   const history = document.getElementById('history');
   history.textContent = '이력 ' + instance.history.length + ' / 10';
@@ -309,7 +362,7 @@ function showRender({ phase, previous, next, changes, componentTree, log }) {
   else if (changes.length) {
     patchStatus.replaceChildren(phase + '() · ' + changes.length + '개 작업',
       ...changes.flatMap(change => [' · ', marker(change.type + ' [' + change.path.join(', ') + ']' +
-        (change.type === 'INSERT' ? ' → 자식 ' + change.index : ''))]));
+        (change.type === 'INSERT' || change.type === 'MOVE' ? ' → 자식 ' + change.index : ''))]));
   } else patchStatus.textContent = 'update() · Diff 결과 없음 · DOM 쓰기 0건';
 
   const effect = effectStatus.textContent;
@@ -319,6 +372,10 @@ function showRender({ phase, previous, next, changes, componentTree, log }) {
 }
 
 const instance = new FunctionComponent(App, app, { onRender: showRender });
+components.addEventListener('click', event => {
+  const item = event.target instanceof Element && event.target.closest('[data-component-fruit]');
+  if (item) selectFruit(findFruit(lastDisplay?.componentTree, item.dataset.componentFruit));
+});
 lifecycle.addEventListener('click', () => {
   eventStatus.textContent = '';
   if (instance.currentTree) instance.unmount();

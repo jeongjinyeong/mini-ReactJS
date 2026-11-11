@@ -295,20 +295,21 @@ await test('장바구니 화면에서 클릭·props·VDOM·Diff와 Hook 기록�
     const doc = frame.contentDocument;
     const app = doc.getElementById('app');
     const grapes = () => app.querySelector('[data-key="grape"]');
-    assert(app.textContent.includes('사과1개') && app.querySelector('.total').textContent === '총 1개', '초기 과일과 총계');
+    assert(app.textContent.includes('사과0개') && app.querySelector('.total').textContent === '총 0개', '초기 과일과 총계');
     equal(doc.getElementById('history').textContent, '이력 1 / 10', '초기 스냅샷 표시');
     const grape = grapes();
     const button = grape.querySelector('button');
     button.click();
     button.click();
     equal([grapes().querySelector('.quantity').textContent, app.querySelector('.total').textContent],
-      ['2개', '총 3개'], '클릭마다 정확히 1개 증가');
+      ['2개', '총 2개'], '클릭마다 정확히 1개 증가');
     assert(grapes() === grape && grape.querySelector('button') === button, '텍스트 패치에서 DOM 요소 재사용');
     assert(doc.getElementById('components').textContent.includes('FruitRow') &&
       doc.getElementById('components').textContent.includes('"count":2'), '자식 props 표시');
     assert(doc.getElementById('previous').textContent.includes('const previousVDOM = {') &&
       doc.getElementById('next').textContent.includes('const nextVDOM = {') &&
-      doc.getElementById('dom').textContent.includes('총 3개'), '이전·새 객체 코드와 실제 DOM');
+      doc.getElementById('dom').textContent.includes('총 2개'), '이전·새 객체 코드와 실제 DOM');
+    app.querySelector('[data-key="apple"] button').click();
     app.querySelector('[data-filter="cart"]').click();
     assert(app.querySelectorAll('.fruit-row').length === 2, '담은 과일 필터');
     const log = doc.getElementById('hook-log').textContent;
@@ -321,7 +322,7 @@ await test('장바구니 화면에서 클릭·props·VDOM·Diff와 Hook 기록�
     doc.getElementById('lifecycle').click();
     assert(!app.firstChild && doc.getElementById('hook-log').textContent.includes('Effect 정리'), '제거와 Effect 정리');
     doc.getElementById('lifecycle').click();
-    equal(app.querySelector('.total').textContent, '총 1개', '다시 마운트한 초기값');
+    equal(app.querySelector('.total').textContent, '총 0개', '다시 마운트한 초기값');
   } finally { frame.remove(); }
 });
 
@@ -339,9 +340,9 @@ await test('Phase 2는 진단 패널에만 최근 변경을 지속적으로 표�
     assert(marks('components').includes('1') && marks('hooks').length >= 2, '변경한 자식 props와 Hook 값 강조');
     assert(marks('hook-log').some(text => text.includes('값 계산')), '실행한 Hook 강조');
     assert(marks('patch-status').every(text => text.includes('UPDATE_TEXT')) && marks('patch-status').length === 2, '변경 작업 두 건 강조');
-    assert(marks('previous').includes('"0개"') && marks('previous').includes('"총 1개"'), '이전 VDOM의 값 강조');
-    assert(marks('next').includes('"1개"') && marks('next').includes('"총 2개"'), '새 VDOM의 값 강조');
-    assert(marks('dom').includes('1개') && marks('dom').includes('총 2개'), '실제 DOM 코드의 값 강조');
+    assert(marks('previous').includes('"0개"') && marks('previous').includes('"총 0개"'), '이전 VDOM의 값 강조');
+    assert(marks('next').includes('"1개"') && marks('next').includes('"총 1개"'), '새 VDOM의 값 강조');
+    assert(marks('dom').includes('1개') && marks('dom').includes('총 1개'), '실제 DOM 코드의 값 강조');
     assert(doc.getElementById('history').classList.contains('change-mark'), '저장된 이력 강조');
     const color = w.getComputedStyle(doc.querySelector('#next .change-mark')).backgroundColor.match(/\d+/g).map(Number);
     assert(color[0] > color[1] + 20, '실제 빨간색 표시');
@@ -359,7 +360,7 @@ await test('Phase 2는 진단 패널에만 최근 변경을 지속적으로 표�
     assert(marks('previous').some(text => text.includes('바나나')), '이전 VDOM에서 제거 대상 강조');
     assert(marks('dom').some(text => text === '<div') && marks('patch-status').some(text => text.includes('REMOVE')), '새 DOM 코드에서 삭제 위치 강조');
     assert(marks('effect-status').length === 1 && marks('hook-log').some(text => text.includes('이전 Effect 정리')), '바뀐 Effect 강조');
-    assert(!marks('next').includes('"총 2개"') && !app.querySelector('.change-mark'), '최근 작업으로 표시 갱신');
+    assert(!marks('next').includes('"총 1개"') && !app.querySelector('.change-mark'), '최근 작업으로 표시 갱신');
   } finally { frame.remove(); }
 });
 
